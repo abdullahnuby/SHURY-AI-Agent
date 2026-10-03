@@ -28,7 +28,9 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
     ), "system"),
     "time": ((
         "what time is it", "tell me the current time", "what is the date", "current time right now",
-        "what day is today", "الساعة كام", "الوقت كام", "ما هو الوقت الحالي"
+        "what day is today", "الساعة كام", "الوقت كام", "ما هو الوقت الحالي",
+        "كم الساعة الآن", "كم الساعة", "كم الساعه", "كم الساعه الان", "أخبرني بالوقت الحالي",
+        "ما هو التاريخ اليوم", "ما تاريخ اليوم", "اليوم كام",
     ), "system"),
     "query_capabilities": ((
         "what can you do", "what are your capabilities", "what can you help with", "what do you support",
@@ -37,11 +39,24 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
     ), "system"),
     "remember_fact": ((
         "remember that my name is", "store my city", "remember this fact", "save this information",
-        "keep this fact", "my name is", "i'm from", "i am from", "i'm originally from", "i am originally from", "i come from", "i was born in", "اسمي", "مدينتي هي", "انا من", "أنا من", "انا اصلي من", "أنا أصلي من", "احفظ هذه المعلومة"
+        "keep this fact", "my name is", "i'm from", "i am from", "i'm originally from", "i am originally from", "i come from", "i was born in",
+        "i live in", "i am living in", "i work as", "my job is", "i am a", "i work in", "my profession is",
+        "اسمي", "مدينتي هي", "انا من", "أنا من", "انا اصلي من", "أنا أصلي من", "احفظ هذه المعلومة",
+        "أنا أعيش في", "انا عايش في", "انا ساكن في", "أنا ساكن في", "أسكن في",
+        "وظيفتي هي", "وظيفتي", "شغلتي", "مهنتي", "أنا شغال", "انا شغال", "بشتغل", "أعمل كـ", "أعمل كـ", "أنا بشتغل",
+        "أنا أفضل", "انا بفضل", "أفضل استخدام", "لغتي المفضلة", "تفضيلي هو",
     ), "memory"),
     "recall_fact": ((
         "what is my name", "who am i", "what is my city", "where is my city", "what city am i in", "what city do i live in", "what language do i prefer", "what is my preferred editor",
-        "do you remember my name", "tell me my name", "tell me my name again", "say my name again", "where am i from", "where do i come from", "what is my origin", "ما اسمي", "قولي اسمي", "قولّي اسمي", "قولي اسمي تاني", "قولّي اسمي تاني", "ما هي مدينتي", "من انا", "انا من فين", "ايه اسمي", "إيه اسمي", "إيه مدينتي"
+        "do you remember my name", "tell me my name", "tell me my name again", "say my name again", "where am i from", "where do i come from", "what is my origin",
+        "what is my job", "what do i do", "what is my profession", "what is my work", "do you remember my job", "do you remember my profession",
+        "where do i live", "where am i living", "what city do i live in",
+        "ما اسمي", "قولي اسمي", "قولّي اسمي", "قولي اسمي تاني", "قولّي اسمي تاني", "ما هي مدينتي", "من انا", "انا من فين", "ايه اسمي", "إيه اسمي", "إيه مدينتي",
+        "اسم مين المسجل عندك", "اسمي ايه عندك", "إيه اسمي عندك",
+        "أنا منين", "أنا منين يا شوري", "أنا من فين يا شوري", "أنا أصلي منين",
+        "أنا بشتغل ايه", "انا بشتغل ايه", "بشتغل إيه", "وظيفتي ايه", "وظيفتي إيه", "شغلتي ايه", "مهنتي ايه", "ما مهنتي", "ما وظيفتي",
+        "أين أعيش", "أين أسكن", "فين ساكن", "فين عايش", "أعيش فين", "أسكن فين", "أين مدينتي", "ما هي مدينتي الحالية",
+        "ما هي لغتي المفضلة", "ما لغتي", "ما لغتي المفضلة", "أنا بفضل ايه", "انا بفضل إيه",
     ), "memory"),
     "memory_search": ((
         "search my memory", "search the memory", "look through my memories", "find this in memory",
@@ -52,11 +67,14 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "tell me what you remember about me", "personal memory profile", "ماذا تعرف عني", "ماذا تتذكر عني"
     ), "memory"),
     "memory_stats": ((
-        "memory stats", "memory statistics", "memory health statistics", "إحصائيات الذاكرة", "احصائيات الذاكرة"
+        "memory stats", "memory statistics", "memory health statistics", "إحصائيات الذاكرة", "احصائيات الذاكرة",
+        "كم معلومة مسجلة عندك", "كم حاجة مسجلة", "كم معلومة عندك", "كام معلومة عندك", "عندك كم معلومة", "كم عدد المعلومات المحفوظة"
     ), "memory"),
     "forget_fact": ((
         "forget my city", "forget my origin", "forget where i am from", "forget this fact", "remove that memory", "delete that memory", "erase this remembered fact",
-        "forget the saved fact", "انس هذه المعلومة", "امسح هذه المعلومة", "احذف الذاكرة"
+        "forget the saved fact", "forget my name", "forget my job", "please forget my name", "erase my name",
+        "انس هذه المعلومة", "امسح هذه المعلومة", "احذف الذاكرة",
+        "انسى اسمي", "انسى", "انس اسمي", "امسح اسمي", "امسح مدينتي", "احذف اسمي", "اشطب اسمي",
     ), "memory"),
     "remember_result": ((
         "save the result as a named fact", "store the output as a named fact", "save the result under a name",
@@ -196,8 +214,24 @@ def _context_boost(text: str, name: str) -> float:
     if re.search(r"\b(?:previous|last)\s+(?:result|output)\s+as\b|النتيجة (?:السابقة|السابق) باسم|الناتج السابق باسم", n, re.I):
         if name == "remember_last_result": boost += 0.52
         if name == "remember_result": boost -= 0.08
-    if re.search(r"\b(?:forget|delete|erase|remove)\b|انس|امسح|احذف", n, re.I) and name == "forget_fact":
+    if re.search(r"\b(?:forget|delete|erase|remove)\b|انس|انسى|امسح|احذف|اشطب", n, re.I) and name == "forget_fact":
         boost += 0.30
+    # Suppress github_learning when the user utterance contains no "github" reference.
+    # This prevents project names or "SHURY"-like tokens from matching github exemplars.
+    if name == "github_learning" and not re.search(r"\bgithub\b", n, re.I):
+        boost -= 0.45
+    # Suppress open_world_learning on personal-fact declarations (first-person statements
+    # about occupation, location, preference). These belong to remember_fact.
+    _personal_fact_pattern = r"""
+        (?:
+            أنا\s+(?:شغال|بشتغل|أعمل|أفضل|ساكن|عايش|من\s+مدينة|أصلي\s+من)|
+            وظيفتي|مهنتي|شغلتي|شغلي|
+            انا\s+(?:شغال|بشتغل|ساكن|عايش)|
+            i\s+(?:work|am\s+a|live|prefer)\b
+        )
+    """
+    if name == "open_world_learning" and re.search(_personal_fact_pattern, n, re.I | re.VERBOSE):
+        boost -= 0.50
     return boost
 
 
