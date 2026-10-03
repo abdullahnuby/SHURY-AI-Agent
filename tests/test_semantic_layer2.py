@@ -4,6 +4,8 @@ import app.knowledge.memory as memory
 from app.core.time import get_timezone, now_in_timezone
 from app.domain.world import WorldState
 from app.intelligence.semantic import semantic_understand
+from app.intelligence.semantic.intents import candidates
+from app.intelligence.semantic.slots import extract_slots
 
 
 def _setup(tmp_path):
@@ -133,3 +135,30 @@ def test_semantic_cross_turn_correction_is_grounded(tmp_path):
     assert p.slots.get("correction:previous_value") == "luxor"
     assert p.slots.get("correction:value") == "cairo"
     assert p.canonical_goal == "correct city to cairo"
+
+
+def test_phase6_normalized_arabic_memory_slots():
+    assert extract_slots("أنا أعيش في مدينة الأقصر").get("fact:city") == "الاقصر"
+    assert extract_slots("أنا شغال دكتور").get("fact:job") == "دكتور"
+    assert extract_slots("أنا أفضل لغة بايثون").get("preference:general") == "لغة بايثون"
+    assert extract_slots("أين أعيش؟").get("recall:key") == "city"
+    assert extract_slots("بشتغل ايه؟").get("recall:key") == "job"
+    assert extract_slots("ما هي لغتي المفضلة؟").get("recall:key") == "preference"
+    assert extract_slots("أنا منين يا شوري؟").get("recall:key") == "origin"
+    assert extract_slots("اسم مين المسجل عندك؟").get("recall:key") == "name"
+
+
+def test_phase6_specialized_intents_and_underspecified_command(tmp_path):
+    _setup(tmp_path)
+    assert semantic_understand("كم معلومة مسجلة عندك؟").top_intent.name == "memory_stats"
+    previous = semantic_understand(
+        "ما هي النتيجة السابقة؟",
+        world=WorldState(last_goal="احسب 20 * 5", last_outputs={"last_result": 100}),
+    )
+    assert previous.top_intent.name == "recall_last_result"
+    assert not previous.needs_clarification
+    assert semantic_understand("نفذ الأمر").needs_clarification
+
+
+def test_project_name_does_not_imply_github_learning():
+    assert all(item.name != "github_learning" for item in candidates("أنا اعمل على مشروع SHURY"))

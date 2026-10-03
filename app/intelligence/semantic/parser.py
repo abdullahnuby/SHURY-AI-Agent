@@ -213,6 +213,28 @@ class SemanticInterpreter:
                 memory_data = {}
         base_intents = candidates(original)
         slots = extract_slots(original)
+        memory_stats_request = bool(re.search(
+            r"^(?:كم|كام)\s+(?:معلومة|حاجة)(?:\s+مسجلة)?(?:\s+عندك)?[؟?]?$", n, re.I
+        ))
+        last_result_request = bool(re.fullmatch(
+            r"(?:ما(?:\s+هي|\s+هو)?\s+(?:ال)?(?:نتيجة|ناتج)\s+(?:السابقة|السابق)|"
+            r"what\s+(?:was|is)\s+(?:the\s+)?(?:previous|last)\s+(?:result|output))[؟?]?",
+            n, re.I,
+        ))
+        underspecified_imperative = bool(re.fullmatch(
+            r"(?:نفذ|نفّذ)\s+(?:الأمر|الامر)|execute\s+the\s+command", n, re.I
+        ))
+        if last_result_request:
+            slots["result:reference"] = "previous"
+            base_intents = [
+                IntentCandidate("recall_last_result", 0.99, ("explicit-previous-result-query",), "memory", source="semantic-rule"),
+                *(item for item in base_intents if item.name != "recall_last_result"),
+            ]
+        elif memory_stats_request:
+            base_intents = [
+                IntentCandidate("memory_stats", 0.99, ("explicit-memory-count-query",), "memory", source="semantic-rule"),
+                *(item for item in base_intents if item.name != "memory_stats"),
+            ]
         learning_topic = _learning_topic(original)
         if learning_topic:
             slots.setdefault("learning_topic", learning_topic)
@@ -433,11 +455,13 @@ class SemanticInterpreter:
             safety.append("instruction-like-content-in-user-input")
         unresolved = [r for r in references if not r.resolved and (r.confidence >= 0.65 or r.kind in {"pronoun", "prior_object"})]
         ambiguous_smalltalk = bool(re.fullmatch(r"(?:ايه|إيه)\s+(?:الاخبار|الأخبار)", n, re.I))
+        if last_result_request:
+            unresolved = []
         # A standalone social turn is a complete conversational act. Tokens such as
         # the "it" in "got it" are not action references and must not force clarification.
         if explicit_social:
             unresolved = []
-        needs = bool(unresolved) or ambiguous_smalltalk
+        needs = bool(unresolved) or ambiguous_smalltalk or underspecified_imperative
         if explicit_social:
             speech_act = "greeting"
         elif re.match(r"^(?:no[, ]+)?(?:i\s+mean|i\s+meant|actually|that\s+isn\'t\s+right|not\s+that|اقصد|أقصد|قصدي|بل|لا)\b", n, re.I):
@@ -497,6 +521,18 @@ class SemanticInterpreter:
             base_intents.sort(key=lambda x: (-x.confidence, x.name))
             base_intents = base_intents[:10]
             slots.setdefault("question", original)
+        if memory_stats_request:
+            base_intents = [
+                IntentCandidate("memory_stats", 0.99, ("explicit-memory-count-query",), "memory", source="semantic-rule"),
+                *(item for item in base_intents if item.name not in {"memory_stats", "knowledge_query"}),
+            ]
+        elif last_result_request:
+            base_intents = [
+                IntentCandidate("recall_last_result", 0.99, ("explicit-previous-result-query",), "memory", source="semantic-rule"),
+                *(item for item in base_intents if item.name != "recall_last_result"),
+            ]
+        top = base_intents[0] if base_intents else None
+        conf = top.confidence if top else 0.0
         reasons = ["reference-unresolved"] if unresolved else []
         if any((not ref.resolved) and ref.kind in {"pronoun", "prior_object"} for ref in references):
             reasons.append("anaphoric_reference_unresolved")
@@ -513,11 +549,11 @@ class SemanticInterpreter:
             temporal=temporal,
             constraints=constraints,
             slots=slots,
-            required_information=[f"تحديد المقصود من '{unresolved[0].text}'"] if unresolved else (["هل تقصد أخبارًا محددة تريد البحث عنها؟"] if ambiguous_smalltalk else []),
-            ambiguity_reasons=(reasons + (["ambiguous-smalltalk"] if ambiguous_smalltalk else [])),
+            required_information=[f"تحديد المقصود من '{unresolved[0].text}'"] if unresolved else (["هل تقصد أخبارًا محددة تريد البحث عنها؟"] if ambiguous_smalltalk else (["تحديد الأمر المطلوب تنفيذه"] if underspecified_imperative else [])),
+            ambiguity_reasons=(reasons + (["ambiguous-smalltalk"] if ambiguous_smalltalk else []) + (["underspecified-imperative"] if underspecified_imperative else [])),
             safety_signals=safety,
             needs_clarification=needs,
-            clarification_question=("هل تقصد أخبارًا محددة تريدني أبحث عنها؟" if ambiguous_smalltalk else ("ممكن توضّح المقصود؟" if needs else "")),
+            clarification_question=("هل تقصد أخبارًا محددة تريدني أبحث عنها؟" if ambiguous_smalltalk else ("ما الأمر الذي تريدني أن أنفذه؟" if underspecified_imperative else ("ممكن توضّح المقصود؟" if needs else ""))),
             confidence=conf,
             speech_act=speech_act,
             actionability=actionability,

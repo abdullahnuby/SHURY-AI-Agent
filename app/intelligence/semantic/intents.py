@@ -44,7 +44,8 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "اسمي", "مدينتي هي", "انا من", "أنا من", "انا اصلي من", "أنا أصلي من", "احفظ هذه المعلومة",
         "أنا أعيش في", "انا عايش في", "انا ساكن في", "أنا ساكن في", "أسكن في",
         "وظيفتي هي", "وظيفتي", "شغلتي", "مهنتي", "أنا شغال", "انا شغال", "بشتغل", "أعمل كـ", "أعمل كـ", "أنا بشتغل",
-        "أنا أفضل", "انا بفضل", "أفضل استخدام", "لغتي المفضلة", "تفضيلي هو",
+        "أنا أفضل", "انا افضل", "انا بفضل", "أفضل استخدام", "لغتي المفضلة", "تفضيلي هو",
+        "انا اعيش في", "انا اسكن في", "وظيفتي هي", "انا اعمل ك",
     ), "memory"),
     "recall_fact": ((
         "what is my name", "who am i", "what is my city", "where is my city", "what city am i in", "what city do i live in", "what language do i prefer", "what is my preferred editor",
@@ -57,6 +58,8 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "أنا بشتغل ايه", "انا بشتغل ايه", "بشتغل إيه", "وظيفتي ايه", "وظيفتي إيه", "شغلتي ايه", "مهنتي ايه", "ما مهنتي", "ما وظيفتي",
         "أين أعيش", "أين أسكن", "فين ساكن", "فين عايش", "أعيش فين", "أسكن فين", "أين مدينتي", "ما هي مدينتي الحالية",
         "ما هي لغتي المفضلة", "ما لغتي", "ما لغتي المفضلة", "أنا بفضل ايه", "انا بفضل إيه",
+        "اسم مين المسجل عندك", "انا منين يا شوري", "اين اعيش", "فين ساكن",
+        "بشتغل ايه", "ما مهنتي", "ما هي لغتي المفضلة",
     ), "memory"),
     "memory_search": ((
         "search my memory", "search the memory", "look through my memories", "find this in memory",
@@ -69,12 +72,18 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
     "memory_stats": ((
         "memory stats", "memory statistics", "memory health statistics", "إحصائيات الذاكرة", "احصائيات الذاكرة",
         "كم معلومة مسجلة عندك", "كم حاجة مسجلة", "كم معلومة عندك", "كام معلومة عندك", "عندك كم معلومة", "كم عدد المعلومات المحفوظة"
+        , "كم معلومة", "كام معلومة مسجلة", "كم حاجة مسجلة عندك"
     ), "memory"),
     "forget_fact": ((
         "forget my city", "forget my origin", "forget where i am from", "forget this fact", "remove that memory", "delete that memory", "erase this remembered fact",
         "forget the saved fact", "forget my name", "forget my job", "please forget my name", "erase my name",
         "انس هذه المعلومة", "امسح هذه المعلومة", "احذف الذاكرة",
         "انسى اسمي", "انسى", "انس اسمي", "امسح اسمي", "امسح مدينتي", "احذف اسمي", "اشطب اسمي",
+        "انسى إسمي", "انس اسمي",
+    ), "memory"),
+    "recall_last_result": ((
+    "what was the previous result", "what was the last result", "what is the previous result",
+    "ما هي النتيجة السابقة", "ما النتيجة السابقة", "ما هو الناتج السابق", "ايه النتيجة السابقة",
     ), "memory"),
     "remember_result": ((
         "save the result as a named fact", "store the output as a named fact", "save the result under a name",
@@ -216,6 +225,8 @@ def _context_boost(text: str, name: str) -> float:
         if name == "remember_result": boost -= 0.08
     if re.search(r"\b(?:forget|delete|erase|remove)\b|انس|انسى|امسح|احذف|اشطب", n, re.I) and name == "forget_fact":
         boost += 0.30
+    if re.search(r"(?:كم|كام)\s+(?:معلومة|حاجة)\b", n, re.I) and name == "memory_stats":
+        boost += 0.42
     # Suppress github_learning when the user utterance contains no "github" reference.
     # This prevents project names or "SHURY"-like tokens from matching github exemplars.
     if name == "github_learning" and not re.search(r"\bgithub\b", n, re.I):
@@ -224,9 +235,9 @@ def _context_boost(text: str, name: str) -> float:
     # about occupation, location, preference). These belong to remember_fact.
     _personal_fact_pattern = r"""
         (?:
-            أنا\s+(?:شغال|بشتغل|أعمل|أفضل|ساكن|عايش|من\s+مدينة|أصلي\s+من)|
+            أنا\s+(?:شغال|بشتغل|أعمل|أفضل|افضل|ساكن|عايش|من\s+مدينة|أصلي\s+من|اصلي\s+من)|
             وظيفتي|مهنتي|شغلتي|شغلي|
-            انا\s+(?:شغال|بشتغل|ساكن|عايش)|
+            انا\s+(?:شغال|بشتغل|اعمل|افضل|ساكن|عايش)|
             i\s+(?:work|am\s+a|live|prefer)\b
         )
     """
@@ -298,6 +309,11 @@ def candidates(text: str) -> list[IntentCandidate]:
                 ROUTES[name][1], old.required_slots if old else (), old.missing_slots if old else (),
                 "retrieval-semantic",
             )
+
+    # Retrieval similarity alone is not sufficient evidence for a GitHub task.
+    # In particular, repository names and project descriptions must not imply GitHub.
+    if not re.search(r"\bgithub\b", normalize(text), re.I):
+        by_name.pop("github_learning", None)
 
     # Social turns are not fuzzy route families. Require a standalone phrase so
     # semantic similarity cannot turn an ordinary request into a social intent.
