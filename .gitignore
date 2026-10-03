@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Local secrets and config
+.env
+.idea/
+.vscode/
+
+# Databases and runtime artifacts
+*.db
+*.db-*
+*.sqlite3
+app/logs/
+logs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Temporary files
+.tmp_*
+*.tmp

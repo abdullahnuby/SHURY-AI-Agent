@@ -1,0 +1,45 @@
+.....................................F.F...............................  [100%]
+=================================== FAILURES ===================================
+________________ test_deictic_skill_request_uses_previous_goal _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-237/test_deictic_skill_request_use0')
+
+    def test_deictic_skill_request_uses_previous_goal(tmp_path: Path):
+        brain = kernel(tmp_path)
+        brain.think('راجع المشروع وشغل الاختبارات', session_id='s1')
+        frame = brain.perceive('اكتشف المهارات المناسبة للمهمة دي', session_id='s1').semantic
+>       assert frame.requested_operation == 'skill_query'
+E       AssertionError: assert 'development_inspection' == 'skill_query'
+E         
+E         - skill_query
+E         + development_inspection
+
+tests/test_v23_semantic_transfer.py:30: AssertionError
+___________ test_phase5_has_100_deterministic_conversational_inputs ____________
+
+    def test_phase5_has_100_deterministic_conversational_inputs():
+        assert len(CASES) == 100
+        observed: dict[str, int] = {}
+        for expected, text in CASES:
+            parse = semantic_understand(text)
+            contract = SemanticContract.from_parse(parse)
+            observed[contract.conversation_class] = observed.get(contract.conversation_class, 0) + 1
+>           assert contract.conversation_class == expected, text
+E           AssertionError: مدينتي هي الأقصر
+E           assert 'CLARIFICATION' == 'MEMORY_WRITE'
+E             
+E             - MEMORY_WRITE
+E             + CLARIFICATION
+
+tests/test_phase5_conversation_classification.py:67: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_v23_semantic_transfer.py::test_deictic_skill_request_uses_previous_goal - AssertionError: assert 'development_inspection' == 'skill_query'
+  
+  - skill_query
+  + development_inspection
+FAILED tests/test_phase5_conversation_classification.py::test_phase5_has_100_deterministic_conversational_inputs - AssertionError: مدينتي هي الأقصر
+assert 'CLARIFICATION' == 'MEMORY_WRITE'
+  
+  - MEMORY_WRITE
+  + CLARIFICATION
+2 failed, 69 passed in 29.92s

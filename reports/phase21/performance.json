@@ -1,0 +1,39 @@
+{
+  "phase": 21,
+  "model": "omarelshehy/Arabic-Retrieval-v1.0",
+  "generated_at_utc": "2026-10-02T22:04:33Z",
+  "model_preflight": {
+    "status": "blocked",
+    "model": "omarelshehy/Arabic-Retrieval-v1.0",
+    "cold_load_ms": null,
+    "preflight_failure_ms": 0.08608899997852859,
+    "error": "RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'"
+  },
+  "real_model": {
+    "status": "blocked",
+    "reason": "RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'",
+    "cold_load_ms": null,
+    "warm_inference_ms": null,
+    "embedding_ms": null,
+    "embedding_p95_ms": null
+  },
+  "diagnostics": {
+    "rag": {
+      "status": "blocked",
+      "error": "RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'"
+    },
+    "e2e_off_mode_diagnostic": {
+      "status": "diagnostic_only",
+      "n": 5,
+      "mean_ms": 1987.233308399982,
+      "p95_ms": 2618.8572490000297,
+      "max_ms": 2618.8572490000297,
+      "tracemalloc_current_bytes": 3267815,
+      "tracemalloc_peak_bytes": 19936382
+    }
+  },
+  "gate": {
+    "real_measurements_complete": false,
+    "model_loaded_once_and_cached": null
+  }
+}

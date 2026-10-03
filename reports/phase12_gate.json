@@ -1,0 +1,26 @@
+{
+  "phase": 12,
+  "gate": "BLOCKED_BY_ENVIRONMENT",
+  "corpus": "benchmarks/dialogues/dialogues_phase10_seed_20261002.jsonl",
+  "requested_sessions": 1000,
+  "executed_sessions": 0,
+  "passed_sessions": 0,
+  "failed_sessions": 0,
+  "model": "omarelshehy/Arabic-Retrieval-v1.0",
+  "nlp_mode": "required",
+  "model_loaded": false,
+  "model_error": "RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'",
+  "full_runner_exit_code": 2,
+  "all_1000_executed": false,
+  "full_internal_traces_recorded": false,
+  "reason": "Production execution is forbidden without the required Arabic-Retrieval-v1.0 dependency/model. No fallback runtime was counted.",
+  "source_runtime_entry": "app.api.run_brain -> CognitiveKernel.act",
+  "runner": "app.evaluation.real_dialogue_runner.RealDialogueRunner",
+  "execution_trace_policy": "one isolated durable state directory per conversation; full CognitiveState trace persisted when execution is available",
+  "verification": {
+    "phase12_tests": "14/14 passed",
+    "compileall": "PASS",
+    "corpus_sessions": 1000,
+    "corpus_turns": 3216
+  }
+}

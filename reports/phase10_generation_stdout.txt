@@ -1,0 +1,10 @@
+{
+  "valid": true,
+  "count": 1000,
+  "unique_ids": 1000,
+  "unique_transcripts": 624,
+  "duplicate_transcripts": 376,
+  "errors": [],
+  "seed": 20261002,
+  "output_dir": "benchmarks/dialogues"
+}

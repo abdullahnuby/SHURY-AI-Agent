@@ -1,0 +1,71 @@
+{
+  "schema_version": "agent-scenario-seed.v1",
+  "seed_version": "100k-v1",
+  "generation_seed": 20260930,
+  "count": 100000,
+  "archetypes": 1000,
+  "variants_per_archetype": 100,
+  "domains": {
+    "core": 4000,
+    "memory": 4000,
+    "knowledge": 4000,
+    "web_research": 4000,
+    "science": 4000,
+    "github": 4000,
+    "data": 4000,
+    "workspace": 4000,
+    "development": 4000,
+    "skills": 4000,
+    "world": 4000,
+    "planning": 4000,
+    "security": 4000,
+    "observability": 4000,
+    "documents": 4000,
+    "project_management": 4000,
+    "productivity": 4000,
+    "communication": 4000,
+    "monitoring": 4000,
+    "data_acquisition": 4000,
+    "quality_assurance": 4000,
+    "workflow_composition": 4000,
+    "model_selection": 4000,
+    "research_ops": 4000,
+    "self_improvement": 4000
+  },
+  "languages": {
+    "en": 25000,
+    "ar": 25000,
+    "mixed": 25000,
+    "conversational": 25000
+  },
+  "styles": {
+    "direct": 20000,
+    "polite": 20000,
+    "constraint_heavy": 20000,
+    "casual": 20000,
+    "followup": 20000
+  },
+  "difficulties": {
+    "easy": 20000,
+    "medium": 20000,
+    "hard": 20000,
+    "long_horizon": 20000,
+    "adversarial": 20000
+  },
+  "subtypes": {
+    "happy_path": 20000,
+    "constraint": 20000,
+    "clarification": 20000,
+    "recovery": 20000,
+    "adversarial": 20000
+  },
+  "source": "synthetic_seed",
+  "derived_from_real_user_campaign": true,
+  "anchor_count": 22,
+  "unique_goal_count": 71459,
+  "unique_task_signature_count": 64990,
+  "sha256_jsonl_content": "ff3af2dd91dae7d3a029250c90533a82b4ba831200649447964003cd0f330eee",
+  "sha256_db": "b4f919f356dcc0b121c27023dd6bc775dcc7728c77b54b40809ddb87c14da4c1",
+  "sha256_jsonl_gz": "33f0eb25c2b6768295423357f36767204780c83ef0f1445bb1d67fb85cb6b31b",
+  "policy": "seed examples are read-only priors; never treated as user memory, execution evidence, or promotion evidence"
+}

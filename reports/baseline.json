@@ -1,0 +1,56 @@
+{
+  "tests": {
+    "command": "python -m pytest tests -q -p no:cacheprovider",
+    "status": "red",
+    "notes": [
+      "The repo is not green in the current environment.",
+      "The pytest command is valid without the missing --timeout plugin, but the suite includes at least one failing/hanging acceptance path during Phase 0 verification.",
+      "The command produced a timeout/hang while running the acceptance suite in the ambiguous request scenario."
+    ],
+    "failing_tests": [
+      "tests/test_real_user_acceptance.py::test_real_user_ambiguous_request_gets_clarification"
+    ],
+    "exit_code": 1,
+    "collection_status": "started and observed with at least one failure/hang"
+  },
+  "runtime": {
+    "cli": {
+      "entry": "app.main -> app.interfaces.cli.main",
+      "status": "starts successfully in a live Python run"
+    },
+    "web": {
+      "entry": "app.interfaces.web.__main__ -> app.interfaces.web.server.main",
+      "status": "present and active in the codebase"
+    },
+    "api": {
+      "entry": "app.api exports run_agent, run_cognitive, run_brain, run_structured_goal",
+      "status": "public facade is active"
+    },
+    "canonical_runtime_candidate": [
+      "app.runtime.cognitive_agent.run_cognitive",
+      "app.runtime.agent.run_agent",
+      "app.brain.kernel.CognitiveKernel.act_structured"
+    ],
+    "observed_runtime_path": "The codebase contains more than one live runtime path; this requires explicit proof rather than an assumption."
+  },
+  "nlp": {
+    "model": "omarelshehy/Arabic-Retrieval-v1.0",
+    "loaded": true,
+    "mode": "required",
+    "device": "cpu",
+    "status": "model successfully loaded during the Phase 0 live check",
+    "warning": [
+      "HF Hub unauthenticated warning was printed during model download.",
+      "FutureWarning: get_sentence_embedding_dimension is renamed in newer sentence-transformers versions."
+    ]
+  },
+  "known_failures": [
+    "The pytest configuration file is empty; the repo relies on default pytest behavior and does not declare the pytest-timeout plugin, so a command using --timeout=120 fails with 'unrecognized arguments'.",
+    "The real runtime under test stalls in the ambiguous user-request acceptance scenario, which is the observed failing path in tests/test_real_user_acceptance.py::test_real_user_ambiguous_request_gets_clarification.",
+    "The codebase has multiple runtime entry points, so the canonical runtime must be proven rather than assumed."
+  ],
+  "environment_blockers": [
+    "pytest-timeout is not installed in the environment, so commands using --timeout=120 fail before the test body runs.",
+    "The acceptance suite still shows a long-running/hanging path in real-user ambiguous-request logic, which blocks clean green-suite verification during this phase."
+  ]
+}
