@@ -12,8 +12,9 @@ def extract_slots(text: str) -> dict[str, str]:
         (r"^(?:no\b|actually\b|i\s+meant|i\s+mean(?!t)|that\s+isn't\s+right|not\s+that)\s*(?:[:,;-]?\s*)?(?:i\s+mean|i\s+meant)?\s*(.+)$", "correction:value"),
         (r"^(?:لا\b|بل\b|قصدي\b|اقصد\b|أقصد\b)\s*(?:[:,;-]?\s*)?(.+)$", "correction:value"),
         (r"(?:my\s+name\s+is|my\s+name\s+as|save\s+my\s+name(?:\s+as)?|store\s+my\s+name(?:\s+as)?|اسمي(?:\s+هو)?|احفظ\s+اسمي(?:\s+هو)?)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:name"),
-        (r"(?:my\s+city\s+is|store\s+my\s+city(?:\s+as)?|save\s+my\s+city(?:\s+as)?|i\s+live\s+in|مدينتي(?:\s+هي)?|احفظ\s+مدينتي(?:\s+باسم)?|انا\s+ساكن\s+في)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:city"),
+        (r"(?:my\s+city\s+is|store\s+my\s+city(?:\s+as)?|save\s+my\s+city(?:\s+as)?|i\s+live\s+in|i\s+am\s+living\s+in|مدينتي(?:\s+هي)?|احفظ\s+مدينتي(?:\s+باسم)?|انا\s+ساكن\s+في|أنا\s+ساكن\s+في|أنا\s+أعيش\s+في(?:\s+مدينة)?|انا\s+عايش\s+في|انا\s+اسكن\s+في|أسكن\s+في)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:city"),
         (r"(?:my\s+language\s+is|my\s+preferred\s+language\s+is|لغتي(?:\s+هي)?)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:language"),
+        (r"(?:my\s+job\s+is|my\s+work\s+is|my\s+profession\s+is|i\s+work\s+as|i\s+am\s+a(?:\s+\w+)?\s+\w|وظيفتي\s+هي|وظيفتي|مهنتي\s+هي|مهنتي|شغلتي|شغلي|أنا\s+شغال|انا\s+شغال|أنا\s+بشتغل|انا\s+بشتغل|بشتغل|أعمل\s+كـ|اعمل\s+كـ|أعمل\s+ك)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:job"),
         # Generic explicit memory assignment. Specific patterns above still win because
         # they preserve canonical aliases such as name/city/origin.
         (r"(?:save|store|remember|احفظ|سجل|افتكر|تذكر(?:\s+ان)?)\s+(?:this|that)\s+(?:information|fact|detail|المعلومة|المعلومة\s+دي|المعلومة\s+ده)\s*[:：=]\s*([^:：=,.!?؟\n]+)\s*[:：=]\s*([^,.!?؟\n]+)", "fact:generic"),
@@ -71,4 +72,9 @@ def extract_slots(text: str) -> dict[str, str]:
         slots["recall:key"] = "language"
     elif re.fullmatch(r"(?:where\s+am\s+i\s+from|where\s+do\s+i\s+come\s+from|what\s+is\s+my\s+origin|من\s+انا|من\s+أنا|انا\s+من\s+فين|أنا\s+من\s+فين|(?:فاكر|تفتكر)\s+(?:انا\s+)?(?:منين|من\s+فين))", question, re.I):
         slots["recall:key"] = "origin"
+    if not slots.get("recall:key"):
+        if re.search(r"(?:أين\s+أعيش|أين\s+أسكن|فين\s+ساكن|فين\s+عايش|أعيش\s+فين|أسكن\s+فين|where\s+do\s+i\s+live|where\s+am\s+i\s+living)", n, re.I):
+            slots["recall:key"] = "city"
+        elif re.search(r"(?:أنا\s+بشتغل\s+ايه|انا\s+بشتغل\s+ايه|بشتغل\s+إيه|وظيفتي\s+ايه|وظيفتي\s+إيه|شغلتي\s+ايه|مهنتي\s+ايه|ما\s+مهنتي|ما\s+وظيفتي|what\s+is\s+my\s+job|what\s+is\s+my\s+profession|what\s+do\s+i\s+do)", n, re.I):
+            slots["recall:key"] = "job"
     return slots

@@ -615,20 +615,23 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _send(self, status: int, body: bytes, content_type: str = "application/json; charset=utf-8") -> None:
-        self.send_response(status)
-        if status == HTTPStatus.TOO_MANY_REQUESTS:
-            self.send_header("Retry-After", str(max(1, int(round(getattr(self, "_retry_after", 1.0))))))
-        if status == HTTPStatus.UNAUTHORIZED:
-            self.send_header("WWW-Authenticate", "Bearer")
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "SAMEORIGIN")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Request-ID", getattr(self, "_shury_request_id", safe_request_id(None)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            if status == HTTPStatus.TOO_MANY_REQUESTS:
+                self.send_header("Retry-After", str(max(1, int(round(getattr(self, "_retry_after", 1.0))))))
+            if status == HTTPStatus.UNAUTHORIZED:
+                self.send_header("WWW-Authenticate", "Bearer")
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Request-ID", getattr(self, "_shury_request_id", safe_request_id(None)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            return
 
     def _json(self, status: int, payload: Any) -> None:
         if isinstance(payload, dict) and "request_id" not in payload:

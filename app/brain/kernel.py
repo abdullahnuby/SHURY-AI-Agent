@@ -195,6 +195,12 @@ class CognitiveKernel:
             if parsed_slots.get('fact:origin') is not None:
                 parsed_slots.setdefault('predicate', 'origin')
                 parsed_slots.setdefault('value', parsed_slots['fact:origin'])
+            if parsed_slots.get('fact:job') is not None:
+                parsed_slots.setdefault('predicate', 'job')
+                parsed_slots.setdefault('value', parsed_slots['fact:job'])
+            if parsed_slots.get('fact:preference') is not None:
+                parsed_slots.setdefault('predicate', 'preference')
+                parsed_slots.setdefault('value', parsed_slots['fact:preference'])
 
             top_intent = parsed.intent_candidates[0].name if parsed.intent_candidates else ''
             operation = str(top_intent or fallback_frame.requested_operation or '').strip()

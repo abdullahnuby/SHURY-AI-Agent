@@ -30,6 +30,30 @@ def test_identity_payload_has_shury():
     assert payload["short_name"] == "شوري"
 
 
+def test_response_write_ignores_disconnected_client():
+    from http import HTTPStatus
+
+    from app.interfaces.web.server import Handler
+
+    class DisconnectedWriter:
+        def write(self, body):
+            raise ConnectionAbortedError("client disconnected")
+
+    class FakeHandler:
+        wfile = DisconnectedWriter()
+
+        def send_response(self, status):
+            pass
+
+        def send_header(self, name, value):
+            pass
+
+        def end_headers(self):
+            pass
+
+    Handler._send(FakeHandler(), HTTPStatus.OK, b"{}")
+
+
 def test_web_health_and_identity_endpoints():
     server, thread = _serve()
     try:

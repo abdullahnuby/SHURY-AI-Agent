@@ -207,7 +207,7 @@ def run_cognitive(
     from app.intelligence.semantic import SemanticInterpreter, LanguagePatternCache
     from app.learning.store import LearningStore, DEFAULT_PATH
 
-    mem = get_memory()
+    mem = brain.memory if getattr(brain, "memory", None) is not None else get_memory()
     pattern_store = LearningStore(os.environ.get("AGENT_LEARNING_DB") or DEFAULT_PATH)
     pattern_cache = LanguagePatternCache(pattern_store)
     registry = load_tools()

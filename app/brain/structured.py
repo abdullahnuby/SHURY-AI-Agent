@@ -131,11 +131,21 @@ def validate_structured_goal(payload: Mapping[str, Any]) -> tuple[GoalSpec, Sema
         slots.setdefault("predicate", "city")
     if "fact:origin" in raw_slots:
         slots.setdefault("predicate", "origin")
+    if "fact:job" in raw_slots:
+        slots.setdefault("predicate", "job")
+    if "fact:preference" in raw_slots:
+        slots.setdefault("predicate", "preference")
+    if "preference:general" in raw_slots:
+        slots.setdefault("predicate", "preference")
+        slots.setdefault("value", raw_slots["preference:general"])
+    if "preference:theme" in raw_slots:
+        slots.setdefault("predicate", "theme")
+        slots.setdefault("value", raw_slots["preference:theme"])
     # `recall_fact` is a generic semantic operation. Only the name key is an identity query;
     # all other keys belong to generic memory so city/origin/language cannot be routed to name.
     # The semantic fact parser yields the value under the fact namespace; the stable Brain
     # contract always calls it `value`.
-    for source in ("fact:name", "fact:city", "fact:origin"):
+    for source in ("fact:name", "fact:city", "fact:origin", "fact:job", "fact:preference", "preference:general", "preference:theme"):
         if source in raw_slots:
             slots.setdefault("value", raw_slots[source])
     if name == "query_identity" and slots.get("key") and slots.get("key") != "name":
