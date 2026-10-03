@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+*.zip
+app/data/*.db
+app/data/*.db-*
+app/data/network_cache/
+app/data/remote/
+app/data/external_skills/
+app/logs/
+data/*.db
+data/*.db-*
+data/evaluations/
+data/evaluations-sim/

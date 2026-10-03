@@ -1,0 +1,997 @@
+{
+  "run_id": "benchmark_run_001",
+  "seed": 1,
+  "rounds": 1,
+  "dialogs": 10,
+  "execution_mode": "live",
+  "categories": {
+    "ambiguous": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 100.0
+    },
+    "context_reference": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 0.0
+    },
+    "data_analysis": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 80.0
+    },
+    "long_horizon_mixed": {
+      "count": 1,
+      "turns": 8,
+      "pass_rate": 75.0
+    },
+    "memory_recall": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 100.0
+    },
+    "multi_step": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 80.0
+    },
+    "personal_memory": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 100.0
+    },
+    "research": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 20.0
+    },
+    "social": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 75.0
+    },
+    "task_execution": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 50.0
+    }
+  },
+  "summary": {
+    "dialogs": 10,
+    "turns_total": 49,
+    "pass_count": 34,
+    "evaluated_turns": 49,
+    "fail_count": 15,
+    "pass_rate": 69.39,
+    "categories": {
+      "ambiguous": {
+        "count": 1,
+        "turns": 4,
+        "pass_rate": 100.0
+      },
+      "context_reference": {
+        "count": 1,
+        "turns": 4,
+        "pass_rate": 0.0
+      },
+      "data_analysis": {
+        "count": 1,
+        "turns": 5,
+        "pass_rate": 80.0
+      },
+      "long_horizon_mixed": {
+        "count": 1,
+        "turns": 8,
+        "pass_rate": 75.0
+      },
+      "memory_recall": {
+        "count": 1,
+        "turns": 5,
+        "pass_rate": 100.0
+      },
+      "multi_step": {
+        "count": 1,
+        "turns": 5,
+        "pass_rate": 80.0
+      },
+      "personal_memory": {
+        "count": 1,
+        "turns": 5,
+        "pass_rate": 100.0
+      },
+      "research": {
+        "count": 1,
+        "turns": 5,
+        "pass_rate": 20.0
+      },
+      "social": {
+        "count": 1,
+        "turns": 4,
+        "pass_rate": 75.0
+      },
+      "task_execution": {
+        "count": 1,
+        "turns": 4,
+        "pass_rate": 50.0
+      }
+    },
+    "metrics": {
+      "tool_routing_accuracy": 73.47,
+      "status_accuracy": 75.51,
+      "reference_resolution": null,
+      "memory_correctness": null,
+      "conversation_success": 30.0,
+      "false_execution": null,
+      "hallucinated_memory": null
+    }
+  },
+  "results": [
+    {
+      "conversation_id": "dialogue-1-0000",
+      "category": "data_analysis",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "حلل ملف sales.csv لاكتشاف القيم الشاذة",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "analyze_dataset"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "حلل القيم المتطرفة في ملف sales.csv",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "analyze_dataset"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "حلل ملف sales.csv ولخص النتائج",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "analyze_dataset"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "حلل ملف sales.csv وحدد السجلات التي ينبغي فحصها بعد ذلك",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "analyze_dataset"
+          ],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 5,
+          "user_message": "حلل ملف sales.csv واقترح تحليلا إضافيا",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "analyze_dataset"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0001",
+      "category": "context_reference",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "analyze the sales report",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 2,
+          "user_message": "ركز على الربع الثالث",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 3,
+          "user_message": "قارنه بالعام الماضي",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 4,
+          "user_message": "لخصه بالعربية",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "data_analysis",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0002",
+      "category": "long_horizon_mixed",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "my name is Abdullah",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "remember_fact",
+            "expected_status": "completed",
+            "expected_key": "name",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "I am from Luxor",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "remember_fact",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "calculate 12*8",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "calculate",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "calculator"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "save it as total",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "remember_result",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 5,
+          "user_message": "What is my name?",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 6,
+          "user_message": "where am I from?",
+          "expected": {
+            "turn": 6,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 7,
+          "user_message": "what was the last result?",
+          "expected": {
+            "turn": 7,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_last_result"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 8,
+          "user_message": "summarize what you know about me",
+          "expected": {
+            "turn": 8,
+            "expected_tool": "memory_profile",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0003",
+      "category": "ambiguous",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "راجع التقرير",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "clarify",
+            "expected_status": "needs_user",
+            "requires_clarification": true
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "حدثه",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "clarify",
+            "expected_status": "needs_user",
+            "requires_clarification": true
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "قارنه بالتقرير السابق",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "clarify",
+            "expected_status": "needs_user",
+            "requires_clarification": true
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "نفذ ذلك الآن",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "clarify",
+            "expected_status": "needs_user",
+            "requires_clarification": true
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0004",
+      "category": "research",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "search the web for agent memory",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "web_research",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 2,
+          "user_message": "focus on recent papers",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "scientific_research",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "arxiv_research"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "compare the sources",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "rag_reasoning",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 4,
+          "user_message": "summarize the result in English",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "rag_reasoning",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 5,
+          "user_message": "which evidence supports the comparison?",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "rag_reasoning",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "answer_question"
+          ],
+          "status": "completed",
+          "route_matches": false,
+          "status_matches": true,
+          "passed": false
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0005",
+      "category": "task_execution",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "calculate 25*16",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "calculate",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "calculator"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "احفظ النتيجة باسم total",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "remember_result",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "save_note"
+          ],
+          "status": "completed",
+          "route_matches": false,
+          "status_matches": true,
+          "passed": false
+        },
+        {
+          "turn": 3,
+          "user_message": "ما قيمة total؟",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "answer_question"
+          ],
+          "status": "completed",
+          "route_matches": false,
+          "status_matches": true,
+          "passed": false
+        },
+        {
+          "turn": 4,
+          "user_message": "calculate 40+10",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "calculate",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "calculator"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0006",
+      "category": "social",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "hello",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "greeting",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "أهلا يا شوري",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "greeting",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": true,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 3,
+          "user_message": "how are you?",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "how_are_you",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "شكرا",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "thanks",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0007",
+      "category": "multi_step",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "calculate 20*15",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "calculate",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "calculator"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "save the result as budget_base",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "remember_result",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_last_result"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "increase it by 20%",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "calculate",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [],
+          "status": "needs_user",
+          "route_matches": false,
+          "status_matches": false,
+          "passed": false
+        },
+        {
+          "turn": 4,
+          "user_message": "save the result as final_budget",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "remember_result",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_last_result"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 5,
+          "user_message": "what is final_budget?",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0008",
+      "category": "personal_memory",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "my name is Abdullah",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "remember_fact",
+            "expected_status": "completed",
+            "expected_key": "name",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "I am from Luxor",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "remember_fact",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "what is my name?",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "where am I from?",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 5,
+          "user_message": "do you remember my name?",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "conversation_id": "dialogue-1-0009",
+      "category": "memory_recall",
+      "results": [
+        {
+          "turn": 1,
+          "user_message": "remember that my favorite editor is VS Code",
+          "expected": {
+            "turn": 1,
+            "expected_tool": "remember_fact",
+            "expected_status": "completed",
+            "expected_key": "result",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "remember_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 2,
+          "user_message": "what editor do I prefer?",
+          "expected": {
+            "turn": 2,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 3,
+          "user_message": "forget my city",
+          "expected": {
+            "turn": 3,
+            "expected_tool": "forget_fact",
+            "expected_status": "completed",
+            "expected_key": "city",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "forget_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 4,
+          "user_message": "what is my city?",
+          "expected": {
+            "turn": 4,
+            "expected_tool": "recall_fact",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "recall_fact"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        },
+        {
+          "turn": 5,
+          "user_message": "what do you remember about me?",
+          "expected": {
+            "turn": 5,
+            "expected_tool": "memory_profile",
+            "expected_status": "completed",
+            "requires_clarification": false
+          },
+          "actual_tools": [
+            "memory_profile"
+          ],
+          "status": "completed",
+          "route_matches": true,
+          "status_matches": true,
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

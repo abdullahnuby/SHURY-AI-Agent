@@ -1,0 +1,31 @@
+{
+  "phase": 15,
+  "status": "PASS",
+  "scope": "root_cause_fixes",
+  "code_addressable_clusters": 8,
+  "code_addressable_clusters_passed": 8,
+  "environment_cluster": {
+    "id": "RC-ENV-01",
+    "status": "blocked_by_environment",
+    "required_model": "omarelshehy/Arabic-Retrieval-v1.0"
+  },
+  "tests": {
+    "phase15": {"passed": 7, "failed": 0},
+    "core_affected": {"passed": 18, "failed": 0},
+    "reference_bilingual_isolated": {"passed": 19, "failed": 0},
+    "phase8_reference": {"passed": 8, "failed": 0},
+    "semantic_contract": {"passed": 3, "failed": 0},
+    "semantic_layer2": {"passed": 13, "failed": 0},
+    "semantic_real_user": {"passed": 19, "failed": 0},
+    "phase10_generator": {"passed": 6, "failed": 0},
+    "phase11_oracle": {"passed": 10, "failed": 0},
+    "phase14_hardening": {"passed": 10, "failed": 0},
+    "compileall": "PASS"
+  },
+  "exact_sentence_patch_audit": "PASS",
+  "phase16_started": false,
+  "notes": [
+    "RC-RUN-01 mitigated by bounded isolated runner; legacy aggregate memory suite still times out under bounded execution.",
+    "RC-ENV-01 remains externally blocked; strict production NLP mode fails closed and no model substitution was made."
+  ]
+}

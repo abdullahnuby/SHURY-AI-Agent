@@ -1,0 +1,32 @@
+{
+  "phase": 16,
+  "status": "PASS",
+  "scope": "regression",
+  "tests": {
+    "phase15": {"passed": 7, "failed": 0},
+    "phase14": {"passed": 10, "failed": 0},
+    "phase8_reference": {"passed": 8, "failed": 0},
+    "phase9_bilingual": {"passed": 10, "failed": 0},
+    "phase10_generator": {"passed": 6, "failed": 0},
+    "phase11_oracle": {"passed": 10, "failed": 0},
+    "phase12_runtime": {"passed": 8, "failed": 0},
+    "phase6_response": {"passed": 6, "failed": 0},
+    "phase7_memory": {"passed": 6, "failed": 0},
+    "canonical_runtime": {"passed": 2, "failed": 0},
+    "semantic_contract": {"passed": 3, "failed": 0},
+    "semantic_layer2": {"passed": 13, "failed": 0},
+    "semantic_real_user": {"passed": 19, "failed": 0},
+    "semantic_transfer": {"passed": 4, "failed": 0},
+    "phase4_learning": {"passed": 5, "failed": 0},
+    "phase10_learning": {"passed": 3, "failed": 0},
+    "compileall": "PASS",
+    "collected": 602
+  },
+  "known_preexisting_failures": [
+    "tests/test_phase5_conversation_classification.py::test_phase5_has_100_deterministic_conversational_inputs"
+  ],
+  "new_regressions": 0,
+  "source_changes": 0,
+  "test_changes": 0,
+  "gate": "PASS"
+}

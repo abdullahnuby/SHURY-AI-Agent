@@ -1,0 +1,97 @@
+[
+  {
+    "id": "dialogue-100-0000",
+    "seed": 100,
+    "category": "multi_step",
+    "language": "arabic",
+    "turns": [
+      "احسب 20*15",
+      "احفظ النتيجة باسم budget_base",
+      "زدها بنسبة 20 بالمئة",
+      "احفظ النتيجة باسم final_budget",
+      "ما قيمة final_budget؟"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0001",
+    "seed": 100,
+    "category": "social",
+    "language": "arabic",
+    "turns": [
+      "مرحبا",
+      "أهلا يا شوري",
+      "عامل إيه؟",
+      "شكرا"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "how_are_you",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "thanks",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  }
+]

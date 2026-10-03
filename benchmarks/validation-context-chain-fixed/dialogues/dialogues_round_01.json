@@ -1,0 +1,95 @@
+[
+  {
+    "id": "dialogue-1-0000",
+    "seed": 1,
+    "category": "data_analysis",
+    "language": "arabic",
+    "turns": [
+      "حلل ملف sales.csv لاكتشاف القيم الشاذة",
+      "حلل القيم المتطرفة في ملف sales.csv",
+      "حلل ملف sales.csv ولخص النتائج",
+      "حلل ملف sales.csv وحدد السجلات التي ينبغي فحصها بعد ذلك",
+      "حلل ملف sales.csv واقترح تحليلا إضافيا"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-1-0001",
+    "seed": 1,
+    "category": "context_reference",
+    "language": "mixed",
+    "turns": [
+      "analyze sales.csv for anomalies",
+      "ركز على الربع الثالث",
+      "قارنه بالعام الماضي",
+      "لخصه بالعربية"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "ar-en"
+    }
+  }
+]

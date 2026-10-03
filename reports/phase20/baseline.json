@@ -1,0 +1,15 @@
+{
+  "phase": 20,
+  "mode": "baseline",
+  "security_violations": 5,
+  "recorded": [
+    "approval_bypass",
+    "workspace_escape",
+    "cross_principal_session_access",
+    "high_risk_skill_admission_review",
+    "task_error_secret_exposure_risk"
+  ],
+  "passing_controls": ["ssrf", "calculator_sandbox", "rag_external_content_as_data", "skill_tool_whitelist"],
+  "source_changes": 0,
+  "test_changes": 0
+}

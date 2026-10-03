@@ -1,0 +1,150 @@
+{
+  "phase": 20,
+  "date": "2026-10-03",
+  "baseline_security_violations": 5,
+  "baseline_findings": [
+    "approval_bypass",
+    "workspace_escape",
+    "cross_principal_session_access",
+    "high_risk_skill_admission_review",
+    "task_error_secret_exposure_risk"
+  ],
+  "current_security_violations": 0,
+  "gate": "PASS",
+  "checks": {
+    "phase20_security_tests": "22/22 PASS",
+    "phase14_production_hardening": "10/10 PASS",
+    "combined": "32/32 PASS",
+    "compileall": "PASS",
+    "javascript_syntax": "PASS",
+    "no_eval_exec_in_app": true,
+    "approval_gated_project_execution": true,
+    "workspace_escape_rejected": true,
+    "http_session_capability_enforced": true,
+    "secret_redaction_verified": true,
+    "prompt_injection_as_data_verified": true,
+    "untrusted_document_instructions_as_data_verified": true,
+    "untrusted_web_instructions_as_data_verified": true,
+    "cross_session_leakage_blocked": true,
+    "unsafe_tool_invocation_blocked": true
+  },
+  "static_execution_findings": [
+    {
+      "file": "app/integrations/devops.py",
+      "line": 23,
+      "call": "subprocess.run",
+      "shell_false": true
+    }
+  ],
+  "approval_or_high_risk_tools": [
+    {
+      "name": "adapt_skill_lifecycle",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "approve_remote_skill",
+      "risk": "high",
+      "requires_approval": true
+    },
+    {
+      "name": "check_project",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "download_dataset",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "forget_fact",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "import_skill_package",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "manage_skill",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "memory_cleanup",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "memory_consolidate",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "memory_forget_all",
+      "risk": "high",
+      "requires_approval": true
+    },
+    {
+      "name": "remember_fact",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "remember_last_result",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "remember_memory",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "remember_result",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "save_note",
+      "risk": "medium",
+      "requires_approval": true
+    },
+    {
+      "name": "write_file",
+      "risk": "medium",
+      "requires_approval": true
+    }
+  ],
+  "project_runtime_artifact_hashes": {
+    "app/data/learning.db": "3d25ba0f46ea700709e4cb7586d5a11cf53e55679996bf38114ad2da2953d45f",
+    "app/data/memory.db": "30b1a1835a0677baaa35eb7c4710dbd800957fba83d311d9018fe4d6182a905d",
+    "app/data/skills.db": "f1e177535cfb560f33027e85bdbd9897d8a528a239ef183dd613a1c60cb6acd9",
+    "app/logs/agent.jsonl": "3d4dcaadcfbc0f530106dbf764c47a2a77ce91f468a35df643853d25150b8bc2"
+  },
+  "intentional_changed_files": [
+    "app/brain/kernel.py",
+    "app/integrations/devops.py",
+    "app/interfaces/web/server.py",
+    "app/interfaces/web/static/app.js",
+    "app/knowledge/memory.py",
+    "app/production/redaction.py",
+    "app/runtime/policy.py",
+    "app/runtime/security.py",
+    "app/tools/data/adaptive_analysis.py",
+    "app/tools/data/analysis.py",
+    "app/tools/development/project.py",
+    "app/tools/integrations/workspace.py",
+    "app/tools/knowledge/rag.py",
+    "app/tools/research/research.py",
+    "app/tools/skills/management.py",
+    "app/tools/skills/research.py",
+    "tests/test_phase20_security.py",
+    "reports/phase20/baseline.json",
+    "reports/phase20/baseline.md",
+    "reports/phase20/security_hashes.json"
+  ],
+  "phase12_model_environment_blocker": "Arabic-Retrieval-v1.0 unavailable; not part of security gate"
+}

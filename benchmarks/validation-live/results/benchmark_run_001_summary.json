@@ -1,0 +1,49 @@
+{
+  "dialogs": 10,
+  "turns_total": 54,
+  "pass_count": 26,
+  "evaluated_turns": 54,
+  "fail_count": 28,
+  "pass_rate": 48.15,
+  "categories": {
+    "ambiguous": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 100.0
+    },
+    "data_analysis": {
+      "count": 2,
+      "turns": 10,
+      "pass_rate": 0.0
+    },
+    "long_horizon_mixed": {
+      "count": 2,
+      "turns": 16,
+      "pass_rate": 68.75
+    },
+    "personal_memory": {
+      "count": 2,
+      "turns": 10,
+      "pass_rate": 80.0
+    },
+    "research": {
+      "count": 2,
+      "turns": 10,
+      "pass_rate": 0.0
+    },
+    "social": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 75.0
+    }
+  },
+  "metrics": {
+    "tool_routing_accuracy": 55.56,
+    "status_accuracy": 62.96,
+    "reference_resolution": null,
+    "memory_correctness": null,
+    "conversation_success": 20.0,
+    "false_execution": null,
+    "hallucinated_memory": null
+  }
+}

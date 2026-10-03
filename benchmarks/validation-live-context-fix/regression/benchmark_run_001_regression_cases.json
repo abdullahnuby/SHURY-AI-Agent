@@ -1,0 +1,505 @@
+[
+  {
+    "id": "dialogue-100-0000",
+    "seed": 100,
+    "category": "multi_step",
+    "language": "arabic",
+    "turns": [
+      "احسب 20*15",
+      "احفظ النتيجة باسم budget_base",
+      "زدها بنسبة 20 بالمئة",
+      "احفظ النتيجة باسم final_budget",
+      "ما قيمة final_budget؟"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0001",
+    "seed": 100,
+    "category": "social",
+    "language": "arabic",
+    "turns": [
+      "مرحبا",
+      "أهلا يا شوري",
+      "عامل إيه؟",
+      "شكرا"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "how_are_you",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "thanks",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0002",
+    "seed": 100,
+    "category": "research",
+    "language": "english",
+    "turns": [
+      "search the web for agent memory",
+      "focus on recent papers",
+      "compare the sources",
+      "summarize the result in English",
+      "which evidence supports the comparison?"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "web_research",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "scientific_research",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "rag_reasoning",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "rag_reasoning",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "rag_reasoning",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "english"
+    }
+  },
+  {
+    "id": "dialogue-100-0003",
+    "seed": 100,
+    "category": "long_horizon_mixed",
+    "language": "mixed",
+    "turns": [
+      "my name is Abdullah",
+      "أنا من الأقصر",
+      "احسب 12*8",
+      "save it as total",
+      "What is my name?",
+      "where am I from?",
+      "what was the last result?",
+      "لخص ما تعرفه عني"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "name",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 6,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 7,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 8,
+        "expected_tool": "memory_profile",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 8,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "ar-en"
+    }
+  },
+  {
+    "id": "dialogue-100-0004",
+    "seed": 100,
+    "category": "task_execution",
+    "language": "arabic",
+    "turns": [
+      "احسب 25*16",
+      "احفظ النتيجة باسم total",
+      "ما قيمة total؟",
+      "احسب 40+10"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_result",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "calculate",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0005",
+    "seed": 100,
+    "category": "personal_memory",
+    "language": "arabic",
+    "turns": [
+      "اسمي عبدالله",
+      "أنا من الأقصر",
+      "ما اسمي؟",
+      "من أين أنا؟",
+      "هل تتذكر اسمي؟"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0006",
+    "seed": 100,
+    "category": "data_analysis",
+    "language": "arabic",
+    "turns": [
+      "حلل ملف sales.csv لاكتشاف القيم الشاذة",
+      "حلل القيم المتطرفة في ملف sales.csv",
+      "حلل ملف sales.csv ولخص النتائج",
+      "حلل ملف sales.csv وحدد السجلات التي ينبغي فحصها بعد ذلك",
+      "حلل ملف sales.csv واقترح تحليلا إضافيا"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0007",
+    "seed": 100,
+    "category": "context_reference",
+    "language": "arabic",
+    "turns": [
+      "حلل ملف sales.csv لاكتشاف القيم الشاذة",
+      "ركز على الربع الثالث",
+      "قارنه بالعام الماضي",
+      "لخصه بالعربية"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "data_analysis",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "arabic"
+    }
+  },
+  {
+    "id": "dialogue-100-0008",
+    "seed": 100,
+    "category": "ambiguous",
+    "language": "english",
+    "turns": [
+      "review the report",
+      "update it",
+      "compare it to the previous one",
+      "do that now"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "clarify",
+        "expected_status": "needs_user",
+        "requires_clarification": true
+      },
+      {
+        "turn": 2,
+        "expected_tool": "clarify",
+        "expected_status": "needs_user",
+        "requires_clarification": true
+      },
+      {
+        "turn": 3,
+        "expected_tool": "clarify",
+        "expected_status": "needs_user",
+        "requires_clarification": true
+      },
+      {
+        "turn": 4,
+        "expected_tool": "clarify",
+        "expected_status": "needs_user",
+        "requires_clarification": true
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "english"
+    }
+  },
+  {
+    "id": "dialogue-100-0009",
+    "seed": 100,
+    "category": "memory_recall",
+    "language": "mixed",
+    "turns": [
+      "remember that my favorite editor is VS Code",
+      "ما محرر النصوص الذي أفضله؟",
+      "انس مدينتي",
+      "what is my city?",
+      "what do you remember about me?"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "forget_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "memory_profile",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "ar-en"
+    }
+  }
+]
