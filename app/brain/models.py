@@ -106,6 +106,7 @@ class GoalSpec:
     success_conditions: tuple[str, ...] = ()
     query: str = ''
     required_evidence: tuple[str, ...] = ()
+    required_capability: str = ''
     priority: float = 0.5
 
     def to_dict(self) -> dict[str, Any]:
@@ -330,6 +331,7 @@ class PlannedAction:
     depends_on: tuple[str, ...] = ()
     expected_effects: tuple[str, ...] = ()
     rationale: str = ''
+    skill_key: str = ''
     # Phase-8 metadata. These fields describe why a safe information action was selected;
     # they never grant execution authority.
     exploration_mode: str = ''
@@ -376,6 +378,8 @@ class CognitiveState:
     hypotheses: list[Hypothesis] = field(default_factory=list)
     capabilities: list[Capability] = field(default_factory=list)
     candidates: list[CandidateAction] = field(default_factory=list)
+    selected_skill: Any = None
+    selected_skills: list[Any] = field(default_factory=list)
     plan: list[PlannedAction] = field(default_factory=list)
     uncertainties: list[str] = field(default_factory=list)
     observations: list[dict[str, Any]] = field(default_factory=list)

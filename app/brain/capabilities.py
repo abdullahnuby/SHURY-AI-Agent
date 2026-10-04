@@ -76,3 +76,60 @@ def discover_candidates(frame: Any, registry: dict[str, Tool]) -> list[Candidate
         ))
     candidates.sort(key=lambda x: (-x.score, x.cost, x.tool))
     return candidates[:10]
+
+
+def discover_skill_candidates(goal_spec: Any, frame: Any, skill_bank: Any) -> list[Any]:
+    """Discover and rank Skill candidates from SkillBank based on capability contracts.
+
+    Skill selection depends on capability requirements, preconditions, and outputs,
+    NOT on raw sentence-pattern matching.
+    """
+    if skill_bank is None:
+        return []
+    try:
+        skills = skill_bank.list()
+    except Exception:
+        return []
+
+    req_cap = str(getattr(goal_spec, 'required_capability', '') or getattr(goal_spec, 'name', '') or '').casefold().strip()
+    op = str(getattr(frame, 'requested_operation', '') or '').casefold().strip()
+    
+    target_caps = set()
+    if req_cap:
+        target_caps.add(req_cap)
+    if op:
+        target_caps.add(op)
+
+    matched = []
+    for skill in skills:
+        if getattr(skill, 'status', '') not in {'approved', 'active'}:
+            continue
+        
+        skill_key = str(getattr(skill, 'key', '') or '').casefold().strip()
+        skill_name = str(getattr(skill, 'name', '') or '').casefold().strip()
+        triggers = tuple(str(x).casefold().strip() for x in (getattr(skill, 'triggers', ()) or ()))
+        outputs = tuple(str(x).casefold().strip() for x in (getattr(skill, 'outputs', ()) or ()))
+        
+        skill_caps = {skill_key, skill_name}
+        workflow = getattr(skill, 'workflow', ()) or ()
+        for item in workflow:
+            if isinstance(item, dict):
+                cap = str(item.get('capability', '') or item.get('tool', '')).casefold().strip()
+                if cap:
+                    skill_caps.add(cap)
+        
+        skill_caps.update(triggers)
+        skill_caps.update(outputs)
+
+        # Require exact match on the target operation/capability or explicit trigger
+        if not (target_caps & {skill_key, skill_name}) and not (req_cap and req_cap in skill_caps and req_cap in triggers):
+            if not (op and op in skill_caps and (op == skill_key or op in triggers)):
+                continue
+
+        overlap = target_caps & skill_caps
+        score = float(getattr(skill, 'utility', 0.5)) + len(overlap) * 0.5
+        matched.append((score, skill))
+
+    matched.sort(key=lambda x: (-x[0], str(getattr(x[1], 'key', ''))))
+    return [item[1] for item in matched]
+

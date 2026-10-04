@@ -9,7 +9,8 @@ from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any, Callable
 
-from app.brain.capabilities import build_capabilities, discover_candidates
+from app.brain.capabilities import build_capabilities, discover_candidates, discover_skill_candidates
+from app.skills.registry import SkillBank
 from app.brain.deliberation import deliberate
 from app.brain.inference import infer, rank_beliefs
 from app.brain.self_model import SelfModel
@@ -51,11 +52,13 @@ class CognitiveKernel:
     def __init__(self, *, memory=None, registry: dict[str, Tool] | None = None,
                  state_store: BrainStateStore | None = None,
                  experience_store: LearningStore | None = None,
-                 learning_manager: SelfImprovementManager | None = None):
+                 learning_manager: SelfImprovementManager | None = None,
+                 skill_bank: SkillBank | None = None):
         self.memory = memory or get_memory()
         self.memory_controller = MemoryController(self.memory)
         self.registry = registry or load_tools()
         self.state_store = state_store or BrainStateStore()
+        self.skill_bank = skill_bank or SkillBank()
         learning_store = None
         if isinstance(experience_store, LearningStore):
             learning_store = experience_store
@@ -218,6 +221,8 @@ class CognitiveKernel:
                 # evidence. Internal/open-ended learning remains `learning_intent`;
                 # the semantic intent can remain open_world_learning for capability data.
                 operation = 'research' if any(marker in parsed.normalized for marker in external_markers) else 'learning_intent'
+            elif parsed_slots.get('expression') and (parsed_slots.get('result:key') or parsed_slots.get('result_key')):
+                operation = 'compound_calculate_remember'
             elif operation in {'remember_fact', 'remember_memory'}:
                 operation = 'remember'
             elif operation == 'forget_fact':
@@ -346,6 +351,14 @@ class CognitiveKernel:
             'source': 'structured_goal' if goal_override else 'natural_language',
         })
         state.beliefs = self._load_beliefs(state.session_id or '')
+        
+        # Micro-Phase 2: Skill Selection as a First-Class Brain Decision
+        # Skill matching depends on capability requirements and Skill contracts from SkillBank.
+        state.selected_skills = discover_skill_candidates(state.goal, state.semantic, self.skill_bank) if state.semantic else []
+        state.selected_skill = state.selected_skills[0] if state.selected_skills else None
+        if state.selected_skill:
+            state.event('skill_selected', key=getattr(state.selected_skill, 'key', ''), name=getattr(state.selected_skill, 'name', ''))
+
         if state.semantic and state.semantic.requested_operation in {'query_identity', 'query_memory'} and not state.evidence:
             query = state.semantic.slot('query') or state.goal.query or 'name'
             state.evidence = rank_beliefs([b.to_dict() for b in state.beliefs], query, limit=8)
@@ -837,12 +850,27 @@ class CognitiveKernel:
                     "duration_ms": outcome_payload.get('duration_ms'),
                     "timestamp": transition.get('timestamp'),
                 })
-            semantic_entities = []
-            for entity in tuple(getattr(state.semantic, 'entities', ()) or ()):
-                if isinstance(entity, (tuple, list)) and len(entity) >= 2:
-                    semantic_entities.append({"type": str(entity[0]), "text": str(entity[1])})
-                elif isinstance(entity, dict):
-                    semantic_entities.append(entity)
+            selected_skill_key = getattr(getattr(state, 'selected_skill', None), 'key', '') or (state.plan[0].skill_key if state.plan else '')
+            contract_inputs = {step.step_id: step.args for step in state.plan}
+            tools_invoked = [item.get('tool') for item in episode_tools]
+            errors_list = [item.get('error') for item in episode_tools if item.get('error')]
+            if status != 'completed' and not errors_list:
+                errors_list.append(final)
+            total_elapsed = round(sum(float(item.get('duration_ms') or 0.0) for item in episode_tools) / 1000.0, 3)
+            contract_verified = verified and all(bool(item.get('verified')) for item in episode_tools) if episode_tools else verified
+
+            execution_record = {
+                'selected_skill': selected_skill_key,
+                'inputs': contract_inputs,
+                'tools_invoked': tools_invoked,
+                'tool_outputs': {k: str(v)[:500] for k, v in outputs.items()},
+                'execution_status': status,
+                'errors': errors_list,
+                'elapsed_execution': total_elapsed,
+                'verification_result': contract_verified,
+            }
+            state.event('execution_record', **execution_record)
+
             self.memory.observe(
                 state.user_text,
                 assistant_text=final,
@@ -860,6 +888,7 @@ class CognitiveKernel:
                     "goal_key": str(state.goal.objective if state.goal else state.user_text),
                     "tool_count": len(episode_tools),
                     "verified_steps": sum(1 for item in episode_tools if item.get("verified")),
+                    "execution_contract": execution_record,
                 },
             )
             state.event('episodic_memory_recorded', tool_events=len(episode_tools))

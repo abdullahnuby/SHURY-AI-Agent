@@ -177,6 +177,10 @@ def _normalize_plan(plan: list[PlannedAction], state_facts: dict[str, Any], *, p
             depends_on=deps,
             expected_effects=step.expected_effects,
             rationale=step.rationale,
+            skill_key=step.skill_key,
+            exploration_mode=step.exploration_mode,
+            information_gain=step.information_gain,
+            exploration_reason=step.exploration_reason,
         ))
     return out
 
@@ -356,6 +360,54 @@ def plan(goal: GoalSpec, frame: Any, candidates: list[CandidateAction], *,
     mandatory_uncertainties = {'learning_topic_required', 'capability_not_identified'}
     if mandatory_uncertainties.intersection(set(getattr(frame, 'uncertainty', ()) or ())):
         return []
+
+    facts = dict(state.world_facts) if state is not None else {}
+    if state is not None and getattr(state, 'selected_skill', None) is not None:
+        skill = state.selected_skill
+        workflow = getattr(skill, 'workflow', ()) or ()
+        skill_steps: list[PlannedAction] = []
+        valid_skill_plan = True
+        for index, item in enumerate(workflow, 1):
+            if isinstance(item, dict):
+                tool_name = str(item.get('tool', '') or item.get('capability', ''))
+                if tool_name in avoid:
+                    valid_skill_plan = False
+                    break
+                if registry and tool_name not in registry:
+                    valid_skill_plan = False
+                    break
+                tool_obj = registry.get(tool_name) if registry else None
+                cap = str(item.get('capability', '') or (getattr(tool_obj, 'capability', None) if tool_obj else None) or tool_name)
+                step_args = dict(item.get('args', {}) or item.get('parameters', {}) or {})
+                if frame:
+                    for k, v in getattr(frame, 'slots', ()) or ():
+                        step_args.setdefault(k, v)
+                skill_steps.append(PlannedAction(
+                    step_id=str(item.get('step_id', '') or f's{index}'),
+                    capability=cap,
+                    tool=tool_name,
+                    args=step_args,
+                    depends_on=tuple(item.get('depends_on', ()) or ()),
+                    expected_effects=tuple(getattr(tool_obj, 'produces', ()) if tool_obj else ()),
+                    rationale=f'Expanded from Skill contract: {getattr(skill, "key", "")}',
+                    skill_key=str(getattr(skill, 'key', '')),
+                ))
+            else:
+                valid_skill_plan = False
+                break
+        if valid_skill_plan and skill_steps and len(skill_steps) == len(workflow):
+            args_ok = True
+            if registry:
+                for step in skill_steps:
+                    t = registry.get(step.tool)
+                    if t and t.params:
+                        errs = t.validate_args(step.args)
+                        if errs:
+                            args_ok = False
+                            break
+            if args_ok:
+                return _normalize_plan(skill_steps, facts)
+
     filtered = [c for c in candidates if c.tool not in avoid]
     allowed_source_tools = _source_allowed_tools(frame)
     if allowed_source_tools is not None:
