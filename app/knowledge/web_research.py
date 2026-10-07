@@ -10,6 +10,7 @@ import json
 import math
 import re
 import time
+from datetime import datetime, timezone
 from collections import Counter
 from urllib.parse import urlparse
 from app.integrations.network import NetworkGateway, extract_text
@@ -31,6 +32,66 @@ def _domain_score(url: str) -> float:
     return 0.70
 
 
+_RESEARCH_STOPWORDS = {
+    "search", "find", "look", "compare", "choose", "select", "best", "latest", "recent",
+    "papers", "paper", "research", "studies", "study", "report", "save", "create", "make",
+    "report", "about", "regarding", "within", "last", "years", "year", "internet", "web",
+    "أحدث", "آخر", "سنتين", "ابحث", "بحث", "قارن", "اختر", "أفضل", "تقرير", "احفظ",
+    "أنشئ", "إنشاء", "على", "عن", "خلال", "سنة", "سنتين", "الإنترنت", "الانترنت",
+    "الويب", "أبحاث", "أوراق", "دراسات", "موثوقة", "موثوق", "للـ", "لل", "ثم", "من",
+}
+
+
+def _research_topic(query: str) -> str:
+    """Extract the substantive research topic from an action-heavy user request.
+
+    This is capability-level normalization: task verbs and artifact instructions are
+    removed before querying providers, so provider search is about the subject rather
+    than the surrounding workflow language.
+    """
+    text = re.sub(r"\s+", " ", str(query or "")).strip()
+    # Prefer the text after common topic introducers and before the next action clause.
+    patterns = (
+        r"(?:about|on|regarding)\s+(.+?)(?=\s+(?:and then|then|compare|save|create|choose)\b|$)",
+        r"(?:عن|حول|بخصوص)\s+(.+?)(?=\s+(?:وقارن|ثم|واحفظ|أنشئ|اختر)\b|$)",
+    )
+    for pattern in patterns:
+        m = re.search(pattern, text, re.I)
+        if m:
+            text = m.group(1).strip(" .،,:;")
+            break
+    tokens = [t for t in _tokens(text) if t not in _RESEARCH_STOPWORDS and len(t) > 2]
+    # Preserve a compact, deterministic topic rather than passing the entire user goal.
+    return " ".join(tokens[:10]) if tokens else text[:240]
+
+
+def _paper_relevance(topic: str, title: str, abstract: str) -> float:
+    tt = set(_tokens(topic))
+    if not tt:
+        return 0.0
+    title_tokens = set(_tokens(title))
+    abstract_tokens = set(_tokens(abstract))
+    title_cov = len(tt & title_tokens) / max(1, len(tt))
+    abstract_cov = len(tt & abstract_tokens) / max(1, len(tt))
+    phrase_bonus = 0.0
+    topic_l = topic.casefold()
+    title_l = title.casefold()
+    for phrase in ("long term memory", "long-term memory", "ai agents", "agent memory", "memory agents"):
+        if phrase in topic_l and phrase in title_l:
+            phrase_bonus = max(phrase_bonus, 0.25)
+    return min(1.0, 0.62 * title_cov + 0.28 * abstract_cov + phrase_bonus)
+
+
+def _arxiv_search_query(topic: str) -> str:
+    tokens = [t for t in _tokens(topic) if t not in _RESEARCH_STOPWORDS and len(t) > 2]
+    if not tokens:
+        return topic.strip()
+    # Require the strongest topic terms while leaving the provider free to match
+    # ordering and inflection. Keep the query short to avoid task-language pollution.
+    important = tokens[:7]
+    return " AND ".join(f'all:"{t}"' for t in important)
+
+
 class WebResearchEngine:
     def __init__(self, gateway: NetworkGateway | None = None, rag: RAGEngine | None = None):
         self.gateway = gateway or NetworkGateway()
@@ -44,7 +105,8 @@ class WebResearchEngine:
         text = extract_text(res.body, res.content_type, res.final_url)
         return {"url": res.final_url, "requested_url": res.requested_url, "status": res.status,
                 "content_type": res.content_type, "sha256": res.sha256, "bytes": len(res.body),
-                "latency_ms": res.latency_ms, "text": text}
+                "latency_ms": res.latency_ms, "text": text,
+                "retrieved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")}
 
     def research(self, query: str, limit: int = 5, index: bool = True) -> dict:
         hits = self.search(query, limit=max(1, min(10, limit)))
@@ -66,7 +128,7 @@ class WebResearchEngine:
                       "snippet": hit.get("snippet", ""), "sha256": fetched["sha256"],
                       "score": round(score, 6), "lexical_coverage": round(lexical, 6),
                       "source_quality": round(source_score, 6), "bytes": fetched["bytes"],
-                      "text": fetched["text"]}
+                      "retrieved_at": fetched.get("retrieved_at"), "text": fetched["text"]}
             if index and fetched["text"]:
                 try:
                     indexed = self.rag.index_knowledge_text(fetched["url"], hit["title"], fetched["text"],
@@ -97,29 +159,61 @@ class WebResearchEngine:
 
     def internet_research(self, query: str, web_limit: int = 5, paper_limit: int = 6, repo_limit: int = 5,
                           index: bool = True, providers=("web", "arxiv", "github")) -> dict:
-        """One bounded research workflow across selected Web/arXiv/GitHub providers.
+        """Run bounded research with provider isolation and graceful degradation.
 
-        Providers are independently selectable so a higher-level policy engine can route
-        research without changing the underlying network safety boundary.
+        Paper-focused research prefers the official arXiv API instead of scraping a search
+        engine. A robots denial or temporary web-provider failure must not abort otherwise
+        valid research from official APIs.
         """
-        providers = tuple(dict.fromkeys(str(x).casefold() for x in providers))
-        web = self.research(query, limit=web_limit, index=index) if "web" in providers else {"sources": [], "count": 0}
-        papers = self.arxiv_research(query, limit=paper_limit, index=index) if "arxiv" in providers else {"papers": [], "count": 0, "indexed": 0}
-        repos = self.github_search(query, limit=repo_limit) if "github" in providers else {"repositories": [], "count": 0}
+        requested = tuple(dict.fromkeys(str(x).casefold() for x in providers))
+        topic = _research_topic(query)
+        paper_focused = bool(re.search(
+            r"(?:latest|recent|newest|last\s+two\s+years|paper|papers|research|literature|arxiv|أحدث|حديث|آخر\s+سنتين|أبحاث|أوراق|دراسات|بحوث)",
+            query or "", re.I))
+        selected = ("arxiv",) if paper_focused else requested
+
+        web = {"sources": [], "count": 0}
+        papers = {"papers": [], "count": 0, "indexed": 0}
+        repos = {"repositories": [], "count": 0}
+        errors = []
+
+        if "web" in selected:
+            try:
+                web = self.research(query, limit=web_limit, index=index)
+            except Exception as exc:
+                errors.append({"provider": "web", "error": str(exc)})
+                web = {"sources": [], "count": 0, "error": str(exc)}
+
+        if "arxiv" in selected:
+            try:
+                papers = self.arxiv_research(topic, limit=max(paper_limit, 12), index=index)
+            except Exception as exc:
+                errors.append({"provider": "arxiv", "error": str(exc)})
+                papers = {"papers": [], "count": 0, "indexed": 0, "error": str(exc)}
+
+        if "github" in selected and not paper_focused:
+            try:
+                repos = self.github_search(query, limit=repo_limit)
+            except Exception as exc:
+                errors.append({"provider": "github", "error": str(exc)})
+                repos = {"repositories": [], "count": 0, "error": str(exc)}
+
         repo_details = []
-        # Learn from a small, relevance-ranked public-project sample.
-        if "github" in providers:
+        if "github" in selected and not paper_focused:
             for row in repos.get("repositories", [])[:2]:
                 try:
                     repo_details.append(self.github_research(row["full_name"], query=query, file_limit=8, index=index))
                 except Exception as exc:
                     repo_details.append({"repo": row.get("full_name"), "error": str(exc)})
+
         indexed = sum(1 for x in web.get("sources", []) if x.get("indexed")) + int(papers.get("indexed", 0))
         indexed += sum(int(x.get("indexed_files", 0)) for x in repo_details)
-        legacy_policy = "web + arXiv + GitHub discovery → bounded fetch → provenance → local-RAG" if set(providers) == {"web", "arxiv", "github"} else "provider policy → bounded fetch → provenance → local-RAG"
-        return {"query": query, "providers": list(providers), "web": web, "arxiv": papers, "github": repos,
-                "github_details": repo_details, "indexed_items": indexed,
-                "policy": legacy_policy,
+        policy = "provider policy → bounded fetch/API → provenance → local-RAG"
+        if paper_focused:
+            policy = "paper-focused policy → topic normalization → official arXiv API → relevance gate → provenance → local-RAG"
+        return {"query": query, "topic": topic, "providers": list(selected), "requested_providers": list(requested),
+                "web": web, "arxiv": papers, "github": repos, "github_details": repo_details,
+                "indexed_items": indexed, "provider_errors": errors, "policy": policy,
                 "note": "external content is evidence; it is not automatically treated as truth or executable instructions"}
 
     def github_search(self, query: str, limit: int = 8) -> dict:
@@ -127,22 +221,39 @@ class WebResearchEngine:
         return {"query":query,"repositories":rows,"count":len(rows),"policy":"GitHub REST repository discovery; updated-first; no code mutation"}
 
     def arxiv_research(self, query: str, limit: int = 8, index: bool = True) -> dict:
-        rows=self.gateway.arxiv_search(query, limit=limit)
-        indexed=0
-        for row in rows:
+        topic = _research_topic(query)
+        provider_query = _arxiv_search_query(topic)
+        raw_rows = self.gateway.arxiv_search(provider_query, limit=max(limit, 12))
+        scored = []
+        for row in raw_rows:
+            relevance = _paper_relevance(topic, row.get("title", ""), row.get("abstract", ""))
+            item = dict(row)
+            item["relevance"] = round(relevance, 6)
+            scored.append(item)
+        scored.sort(key=lambda row: (-float(row.get("relevance", 0.0)), str(row.get("published", ""))), reverse=False)
+        # Do not allow arbitrary latest papers to masquerade as answers. Require a
+        # minimum topic match and retain a small pool for transparent evidence.
+        qualifying = [row for row in scored if float(row.get("relevance", 0.0)) >= 0.18]
+        qualifying = qualifying[:max(1, min(20, limit))]
+        retrieved_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        qualifying = [dict(row, retrieved_at=row.get("retrieved_at") or retrieved_at) for row in qualifying]
+        indexed = 0
+        for row in qualifying:
             abstract=row.get("abstract","")
             if not abstract or not index:
                 continue
             payload=f"Title: {row.get('title','')}\nAuthors: {', '.join(row.get('authors',[]))}\nPublished: {row.get('published','')}\nURL: {row.get('url','')}\n\nAbstract: {abstract}"
             try:
                 self.rag.index_knowledge_text(row["url"], row["title"], payload,
-                                             provenance={"origin":"arxiv_research","source_kind":"arxiv","query":query,"published":row.get("published"),"updated":row.get("updated"),"sha256":__import__('hashlib').sha256(payload.encode('utf-8')).hexdigest()})
+                                             provenance={"origin":"arxiv_research","source_kind":"arxiv","query":topic,"provider_query":provider_query,"published":row.get("published"),"updated":row.get("updated"),"sha256":__import__('hashlib').sha256(payload.encode('utf-8')).hexdigest()})
                 indexed += 1
             except Exception:
                 pass
             row["indexed"] = True
-        return {"query":query,"papers":rows,"count":len(rows),"indexed":indexed,
-                "policy":"arXiv official API→newest-first→abstract provenance→local-RAG"}
+        return {"query": query, "topic": topic, "provider_query": provider_query, "papers": qualifying,
+                "candidate_count": len(raw_rows), "count": len(qualifying), "indexed": indexed,
+                "relevance_gate": {"threshold": 0.18, "qualifying": len(qualifying)},
+                "policy":"topic normalization→arXiv official API→relevance gate→newest qualified evidence→abstract provenance→local-RAG"}
 
     def github_research(self, repo: str, query: str = "", file_limit: int = 30, index: bool = True) -> dict:
         meta = self.gateway.github_repo(repo)
@@ -172,6 +283,7 @@ class WebResearchEngine:
             if len(text) > 120_000:
                 text = text[:120_000]
             row = {"path": path, "url": item["url"], "sha256": item["sha256"], "bytes": len(item["text"]),
+                   "retrieved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
                    "text": text}
             if index and text.strip():
                 try:

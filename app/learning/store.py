@@ -1,4 +1,6 @@
+
 from __future__ import annotations
+from typing import Any
 import hashlib
 import os
 import json
@@ -241,6 +243,56 @@ CREATE TABLE IF NOT EXISTS recovery_lessons (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_recovery_lessons_failure ON recovery_lessons(failure_class,status,verified_successes DESC);
+CREATE TABLE IF NOT EXISTS company_delegation_evidence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    capability TEXT NOT NULL,
+    department TEXT NOT NULL,
+    specialist TEXT NOT NULL,
+    skill_key TEXT NOT NULL DEFAULT '',
+    tool TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    verified_successes INTEGER NOT NULL DEFAULT 0,
+    verified_failures INTEGER NOT NULL DEFAULT 0,
+    total_duration REAL NOT NULL DEFAULT 0,
+    last_failure_class TEXT NOT NULL DEFAULT '',
+    last_run_id TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    UNIQUE(capability, department, specialist, tool)
+);
+CREATE INDEX IF NOT EXISTS idx_company_delegation_evidence_capability ON company_delegation_evidence(capability, verified_successes DESC, attempts DESC);
+CREATE TABLE IF NOT EXISTS company_projects (
+    project_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    priority REAL NOT NULL DEFAULT 0.5,
+    horizon TEXT NOT NULL DEFAULT 'medium',
+    status TEXT NOT NULL DEFAULT 'active',
+    criticality REAL NOT NULL DEFAULT 0.5,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_company_projects_status_priority ON company_projects(status, priority DESC, updated_at DESC);
+CREATE TABLE IF NOT EXISTS company_project_tasks (
+    project_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    objective TEXT NOT NULL,
+    department TEXT NOT NULL DEFAULT '',
+    specialist TEXT NOT NULL DEFAULT '',
+    priority REAL NOT NULL DEFAULT 0.5,
+    horizon TEXT NOT NULL DEFAULT 'medium',
+    status TEXT NOT NULL DEFAULT 'pending',
+    depends_on TEXT NOT NULL DEFAULT '[]',
+    estimated_duration REAL NOT NULL DEFAULT 0,
+    exclusive_resources TEXT NOT NULL DEFAULT '[]',
+    ready INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, task_id),
+    FOREIGN KEY(project_id) REFERENCES company_projects(project_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_company_project_tasks_project_status ON company_project_tasks(project_id, status, priority DESC);
 CREATE TABLE IF NOT EXISTS transition_models (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     state_signature TEXT NOT NULL,
@@ -561,6 +613,21 @@ CREATE TABLE IF NOT EXISTS bandit_observations (
     UNIQUE(source_event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_bandit_observations_state ON bandit_observations(state_signature, id DESC);
+CREATE TABLE IF NOT EXISTS company_change_proposals (
+    proposal_id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    change_kind TEXT NOT NULL,
+    target_key TEXT NOT NULL DEFAULT '',
+    payload TEXT NOT NULL DEFAULT '{}',
+    evidence TEXT NOT NULL DEFAULT '[]',
+    regression TEXT NOT NULL DEFAULT '{}',
+    security_review TEXT NOT NULL DEFAULT '{}',
+    executive_approval TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'proposed',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_company_change_status ON company_change_proposals(company_id, status, updated_at DESC);
 """
 
 
@@ -757,6 +824,18 @@ class LearningStore:
                     'source': str(source), 'provenance': str(provenance), 'revision': revision, 'status': 'active',
                     'supersedes': supersedes, 'updated_at': now,
                 }
+        finally:
+            conn.close()
+
+    def delete_belief(self, *, session_id: str, subject: str, predicate: str) -> int:
+        conn = _connect(self.path)
+        try:
+            with conn:
+                cur = conn.execute(
+                    "UPDATE beliefs SET status='deleted', updated_at=? WHERE session_id=? AND subject=? AND predicate=? AND status='active'",
+                    (_now(), str(session_id), str(subject), str(predicate)),
+                )
+                return int(cur.rowcount or 0)
         finally:
             conn.close()
 
@@ -2106,6 +2185,7 @@ class LearningStore:
             conn.close()
 
     def update_replay_priorities(self, updates: list[dict]) -> int:
+        from .replay import replay_priority_components
         if not updates:
             return 0
         conn = _connect(self.path)
@@ -2352,6 +2432,115 @@ class LearningStore:
             except Exception:
                 metrics = {}
             out.append({"id": int(row[0]), "run_id": row[1], "metrics": metrics, "created_at": row[3]})
+        return out
+
+    def create_company_change_proposal(self, *, proposal_id: str, company_id: str, change_kind: str,
+                                       target_key: str = "", payload: dict | None = None,
+                                       evidence: list | None = None, regression: dict | None = None) -> dict:
+        now = _now()
+        row = {
+            "proposal_id": str(proposal_id), "company_id": str(company_id), "change_kind": str(change_kind),
+            "target_key": str(target_key or ""), "payload": dict(payload or {}),
+            "evidence": list(evidence or []), "regression": dict(regression or {}),
+            "security_review": {}, "executive_approval": {}, "status": "proposed",
+            "created_at": now, "updated_at": now,
+        }
+        conn = _connect(self.path)
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO company_change_proposals(proposal_id,company_id,change_kind,target_key,payload,evidence,regression,security_review,executive_approval,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (row["proposal_id"], row["company_id"], row["change_kind"], row["target_key"],
+                     _safe_json(row["payload"]), _safe_json(row["evidence"]), _safe_json(row["regression"]),
+                     _safe_json(row["security_review"]), _safe_json(row["executive_approval"]), row["status"], now, now),
+                )
+        finally:
+            conn.close()
+        return row
+
+    def get_company_change_proposal(self, proposal_id: str) -> dict | None:
+        conn = _connect(self.path)
+        try:
+            row = conn.execute(
+                "SELECT proposal_id,company_id,change_kind,target_key,payload,evidence,regression,security_review,executive_approval,status,created_at,updated_at FROM company_change_proposals WHERE proposal_id=?",
+                (str(proposal_id),),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        return {
+            "proposal_id": row[0], "company_id": row[1], "change_kind": row[2], "target_key": row[3],
+            "payload": json.loads(row[4] or "{}"), "evidence": json.loads(row[5] or "[]"),
+            "regression": json.loads(row[6] or "{}"), "security_review": json.loads(row[7] or "{}"),
+            "executive_approval": json.loads(row[8] or "{}"), "status": row[9],
+            "created_at": row[10], "updated_at": row[11],
+        }
+
+    def list_company_change_proposals(self, company_id: str, *, limit: int = 100, status: str | None = None) -> list[dict]:
+        conn = _connect(self.path)
+        try:
+            sql = "SELECT proposal_id,company_id,change_kind,target_key,payload,evidence,regression,security_review,executive_approval,status,created_at,updated_at FROM company_change_proposals WHERE company_id=?"
+            params: list = [str(company_id)]
+            if status:
+                sql += " AND status=?"
+                params.append(str(status))
+            sql += " ORDER BY updated_at DESC, proposal_id DESC LIMIT ?"
+            params.append(max(1, int(limit)))
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        finally:
+            conn.close()
+        return [
+            {
+                "proposal_id": r[0], "company_id": r[1], "change_kind": r[2], "target_key": r[3],
+                "payload": json.loads(r[4] or "{}"), "evidence": json.loads(r[5] or "[]"),
+                "regression": json.loads(r[6] or "{}"), "security_review": json.loads(r[7] or "{}"),
+                "executive_approval": json.loads(r[8] or "{}"), "status": r[9],
+                "created_at": r[10], "updated_at": r[11],
+            } for r in rows
+        ]
+
+    def update_company_change_proposal(self, proposal_id: str, *, status: str | None = None,
+                                       regression: dict | None = None, security_review: dict | None = None,
+                                       executive_approval: dict | None = None) -> dict | None:
+        current = self.get_company_change_proposal(proposal_id)
+        if current is None:
+            return None
+        next_status = str(status or current["status"])
+        conn = _connect(self.path)
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE company_change_proposals SET status=?, regression=?, security_review=?, executive_approval=?, updated_at=? WHERE proposal_id=?",
+                    (next_status, _safe_json(regression if regression is not None else current["regression"]),
+                     _safe_json(security_review if security_review is not None else current["security_review"]),
+                     _safe_json(executive_approval if executive_approval is not None else current["executive_approval"]),
+                     _now(), str(proposal_id)),
+                )
+        finally:
+            conn.close()
+        return self.get_company_change_proposal(proposal_id)
+
+    def recent_evolution_events(self, *, limit: int = 100, candidate_key: str | None = None) -> list[dict]:
+        conn = _connect(self.path)
+        try:
+            sql = "SELECT candidate_key,action,reason,payload,created_at FROM evolution_events"
+            params: list = []
+            if candidate_key is not None:
+                sql += " WHERE candidate_key=?"
+                params.append(str(candidate_key))
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(max(1, int(limit)))
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        finally:
+            conn.close()
+        out = []
+        for row in rows:
+            try:
+                payload = json.loads(row[3] or '{}')
+            except Exception:
+                payload = {}
+            out.append({"candidate_key": row[0], "action": row[1], "reason": row[2], "payload": payload, "created_at": row[4]})
         return out
 
     def record_event(self, candidate_key: str, action: str, reason: str, payload: dict | None = None) -> None:
@@ -2897,6 +3086,144 @@ class LearningStore:
                 }
         finally:
             conn.close()
+
+    def record_company_delegation_outcome(self, *, capability: str, department: str, specialist: str,
+                                          skill_key: str = '', tool: str, verified: bool,
+                                          duration: float = 0.0, run_id: str = '',
+                                          failure_class: str = '') -> dict:
+        """Persist bounded organizational delegation evidence in the existing LearningStore.
+
+        This is optimization/execution evidence, not user memory and not ownership truth.
+        Ownership remains declarative in OrganizationCatalog; this table only records outcomes.
+        """
+        now = _now()
+        conn = _connect(self.path)
+        try:
+            with conn:
+                row = conn.execute(
+                    "SELECT attempts,verified_successes,verified_failures,total_duration FROM company_delegation_evidence WHERE capability=? AND department=? AND specialist=? AND tool=?",
+                    (str(capability), str(department), str(specialist), str(tool)),
+                ).fetchone()
+                attempts = int(row[0] or 0) if row else 0
+                successes = int(row[1] or 0) if row else 0
+                failures = int(row[2] or 0) if row else 0
+                total_duration = float(row[3] or 0.0) if row else 0.0
+                attempts += 1
+                if verified:
+                    successes += 1
+                else:
+                    failures += 1
+                total_duration += max(0.0, float(duration or 0.0))
+                conn.execute(
+                    "INSERT INTO company_delegation_evidence(capability,department,specialist,skill_key,tool,attempts,verified_successes,verified_failures,total_duration,last_failure_class,last_run_id,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(capability,department,specialist,tool) DO UPDATE SET skill_key=excluded.skill_key,attempts=excluded.attempts,verified_successes=excluded.verified_successes,verified_failures=excluded.verified_failures,total_duration=excluded.total_duration,last_failure_class=excluded.last_failure_class,last_run_id=excluded.last_run_id,updated_at=excluded.updated_at",
+                    (str(capability), str(department), str(specialist), str(skill_key or ''), str(tool), attempts, successes, failures, total_duration,
+                     str(failure_class or ''), str(run_id or ''), now),
+                )
+                return {
+                    'capability': str(capability), 'department': str(department), 'specialist': str(specialist),
+                    'skill_key': str(skill_key or ''), 'tool': str(tool), 'attempts': attempts,
+                    'verified_successes': successes, 'verified_failures': failures,
+                    'verified_success_rate': round(successes / max(1, attempts), 6),
+                }
+        finally:
+            conn.close()
+
+    def company_delegation_evidence(self, *, capability: str | None = None, limit: int = 50) -> list[dict]:
+        clauses = []
+        args = []
+        if capability:
+            clauses.append('capability=?')
+            args.append(str(capability))
+        where = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
+        conn = _connect(self.path)
+        try:
+            rows = conn.execute(
+                "SELECT capability,department,specialist,skill_key,tool,attempts,verified_successes,verified_failures,total_duration,last_failure_class,last_run_id,updated_at FROM company_delegation_evidence"
+                + where + " ORDER BY verified_successes DESC, attempts DESC, specialist, tool LIMIT ?",
+                (*args, max(1, int(limit))),
+            ).fetchall()
+        finally:
+            conn.close()
+        return [
+            {
+                'capability': r[0], 'department': r[1], 'specialist': r[2], 'skill_key': r[3], 'tool': r[4],
+                'attempts': int(r[5]), 'verified_successes': int(r[6]), 'verified_failures': int(r[7]),
+                'total_duration': float(r[8]), 'last_failure_class': r[9], 'last_run_id': r[10], 'updated_at': r[11],
+                'verified_success_rate': int(r[6]) / max(1, int(r[5])),
+            } for r in rows
+        ]
+
+    def create_company_project(self, project: dict) -> dict:
+        now = str(project.get('created_at') or project.get('updated_at') or _now())
+        conn = _connect(self.path)
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO company_projects(project_id,name,objective,priority,horizon,status,criticality,metadata,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (str(project['project_id']), str(project.get('name') or project['project_id']), str(project.get('objective') or ''),
+                     float(project.get('priority',0.5)), str(project.get('horizon') or 'medium'), str(project.get('status') or 'active'),
+                     float(project.get('criticality',0.5)), _safe_json(project.get('metadata') or {}), int(project.get('version',1)), now, now),
+                )
+            return self.get_company_project(str(project['project_id'])) or dict(project)
+        finally:
+            conn.close()
+
+    def get_company_project(self, project_id: str) -> dict | None:
+        conn = _connect(self.path)
+        try:
+            row = conn.execute("SELECT project_id,name,objective,priority,horizon,status,criticality,metadata,version,created_at,updated_at FROM company_projects WHERE project_id=?", (str(project_id),)).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        return {'project_id':row[0],'name':row[1],'objective':row[2],'priority':float(row[3]),'horizon':row[4],'status':row[5],'criticality':float(row[6]),'metadata':json.loads(row[7] or '{}'),'version':int(row[8]),'created_at':row[9],'updated_at':row[10]}
+
+    def list_company_projects(self, *, active_only: bool = False) -> list[dict]:
+        conn = _connect(self.path)
+        try:
+            where = " WHERE status='active'" if active_only else ''
+            rows = conn.execute("SELECT project_id,name,objective,priority,horizon,status,criticality,metadata,version,created_at,updated_at FROM company_projects"+where+" ORDER BY priority DESC, project_id").fetchall()
+        finally:
+            conn.close()
+        return [{'project_id':r[0],'name':r[1],'objective':r[2],'priority':float(r[3]),'horizon':r[4],'status':r[5],'criticality':float(r[6]),'metadata':json.loads(r[7] or '{}'),'version':int(r[8]),'created_at':r[9],'updated_at':r[10]} for r in rows]
+
+    def update_company_project(self, project_id: str, changes: dict) -> None:
+        if not changes:
+            return
+        fields=[];args=[]
+        for key in ('name','objective','priority','horizon','status','criticality','metadata'):
+            if key in changes:
+                fields.append(key+'=?'); args.append(_safe_json(changes[key]) if key=='metadata' else changes[key])
+        if not fields:
+            return
+        fields.extend(['version=version+1','updated_at=?']); args.extend([_now(), str(project_id)])
+        conn=_connect(self.path)
+        try:
+            with conn: conn.execute('UPDATE company_projects SET '+','.join(fields)+' WHERE project_id=?', tuple(args))
+        finally: conn.close()
+
+    def upsert_company_project_task(self, task: dict) -> None:
+        conn=_connect(self.path)
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO company_project_tasks(project_id,task_id,objective,department,specialist,priority,horizon,status,depends_on,estimated_duration,exclusive_resources,ready,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(project_id,task_id) DO UPDATE SET objective=excluded.objective,department=excluded.department,specialist=excluded.specialist,priority=excluded.priority,horizon=excluded.horizon,status=excluded.status,depends_on=excluded.depends_on,estimated_duration=excluded.estimated_duration,exclusive_resources=excluded.exclusive_resources,ready=excluded.ready,updated_at=excluded.updated_at",
+                    (str(task['project_id']),str(task['task_id']),str(task.get('objective') or ''),str(task.get('department') or ''),str(task.get('specialist') or ''),float(task.get('priority',0.5)),str(task.get('horizon') or 'medium'),str(task.get('status') or 'pending'),_safe_json(task.get('depends_on') or []),float(task.get('estimated_duration',0.0)),_safe_json(task.get('exclusive_resources') or []),int(bool(task.get('ready',True))),str(task.get('created_at') or _now()),str(task.get('updated_at') or _now())),
+                )
+        finally: conn.close()
+
+    def list_company_project_tasks(self, project_id: str, *, active_only: bool = False) -> list[dict]:
+        conn=_connect(self.path)
+        try:
+            where=" AND status NOT IN ('completed','verified','cancelled')" if active_only else ''
+            rows=conn.execute("SELECT project_id,task_id,objective,department,specialist,priority,horizon,status,depends_on,estimated_duration,exclusive_resources,ready,created_at,updated_at FROM company_project_tasks WHERE project_id=?"+where+" ORDER BY priority DESC, task_id",(str(project_id),)).fetchall()
+        finally: conn.close()
+        out=[]
+        for r in rows:
+            out.append({'project_id':r[0],'task_id':r[1],'objective':r[2],'department':r[3],'specialist':r[4],'priority':float(r[5]),'horizon':r[6],'status':r[7],'depends_on':json.loads(r[8] or '[]'),'estimated_duration':float(r[9]),'exclusive_resources':json.loads(r[10] or '[]'),'ready':bool(r[11]),'created_at':r[12],'updated_at':r[13]})
+        return out
 
     def recovery_lessons(self, *, failure_class: str | None = None, status: str | None = None, limit: int = 50) -> list[dict]:
         clauses=[];args=[]

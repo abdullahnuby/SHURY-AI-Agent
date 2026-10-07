@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS skills (
     termination TEXT NOT NULL DEFAULT '',
     outputs TEXT NOT NULL DEFAULT '[]',
     evidence TEXT NOT NULL DEFAULT '[]',
+    verification TEXT NOT NULL DEFAULT '[]',
     confidence REAL NOT NULL DEFAULT 0.5,
     trust_level TEXT NOT NULL DEFAULT 'local',
     success_count INTEGER NOT NULL DEFAULT 0,
@@ -73,6 +74,7 @@ class SkillCandidate:
     source: str
     source_run_id: str | None
     updated_at: str
+    verification: tuple[dict, ...] = ()
 
     @property
     def utility(self) -> float:
@@ -85,9 +87,10 @@ class SkillCandidate:
 
 
 class SkillBank:
-    def __init__(self, path=None):
+    def __init__(self, path=None, *, bootstrap: bool | None = None):
         configured = path or __import__("os").environ.get("AGENT_SKILLS_DB") or DEFAULT_PATH
         self.path = Path(configured)
+        self._bootstrap_requested = bootstrap
         self.path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.path)
         try:
@@ -96,9 +99,35 @@ class SkillBank:
                 cols = {r[1] for r in conn.execute("PRAGMA table_info(skills)").fetchall()}
                 if "trust_level" not in cols:
                     conn.execute("ALTER TABLE skills ADD COLUMN trust_level TEXT NOT NULL DEFAULT 'local'")
+                if "verification" not in cols:
+                    conn.execute("ALTER TABLE skills ADD COLUMN verification TEXT NOT NULL DEFAULT '[]'")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_skills_trust ON skills(trust_level, updated_at)")
+            if self._should_bootstrap():
+                self._bootstrap_builtins()
         finally:
             conn.close()
+
+    def _should_bootstrap(self) -> bool:
+        if self._bootstrap_requested is not None:
+            return bool(self._bootstrap_requested)
+        return self.path.resolve() == DEFAULT_PATH.resolve() or str(__import__("os").environ.get("AGENT_BOOTSTRAP_BUILTIN_SKILLS", "")).casefold() in {"1", "true", "yes"}
+
+    def _bootstrap_builtins(self) -> None:
+        try:
+            from app.skills.builtin import BUILTIN_SKILLS
+        except Exception:
+            return
+        existing_rows = {str(row[0]): str(row[1]) for row in self._q("SELECT key,source FROM skills")}
+        for spec in BUILTIN_SKILLS:
+            key = str(spec.get("key") or "")
+            if not key:
+                continue
+            # Built-in Skills are part of the shipped runtime contract. Refresh an existing
+            # built-in definition when the code contract changes (hash/versioned upsert), while
+            # never overwriting a separately owned external Skill that happens to reuse a key.
+            source = existing_rows.get(key)
+            if source in (None, "builtin"):
+                self.upsert(**spec)
 
     def _connect(self):
         return sqlite3.connect(self.path)
@@ -110,13 +139,13 @@ class SkillBank:
 
     def upsert(self, *, key: str, name: str, triggers=(), contraindications=(), preconditions=(),
                workflow=(), termination="verified outputs produced or explicit failure",
-               outputs=(), evidence=(), confidence=0.5, source="runtime", source_run_id=None,
+               outputs=(), evidence=(), verification=(), confidence=0.5, source="runtime", source_run_id=None,
                status="candidate") -> SkillCandidate:
         payload = {
             "key": key, "name": name, "triggers": list(triggers),
             "contraindications": list(contraindications), "preconditions": list(preconditions),
             "workflow": list(workflow), "termination": termination, "outputs": list(outputs),
-            "evidence": list(evidence), "source": source,
+            "evidence": list(evidence), "verification": list(verification), "source": source,
         }
         chash = self._hash(payload)
         now = _now()
@@ -125,20 +154,22 @@ class SkillBank:
             sid, version, success, failure, old_status, old_trust = existing[0]
             # Preserve approval/active lifecycle status across refreshed versions.
             final_status = old_status if old_status in {"approved", "active", "deprecated"} else status
-            trust_level = old_trust if old_trust else ("local" if str(source) == "runtime" else "quarantined")
+            trust_level = old_trust if old_trust else ("local" if str(source) in {"runtime", "builtin", "system"} else "quarantined")
             version = int(version) + 1 if chash != self._q("SELECT content_hash FROM skills WHERE id=?", (sid,))[0][0] else int(version)
-            self._q("UPDATE skills SET name=?,version=?,status=?,triggers=?,contraindications=?,preconditions=?,workflow=?,termination=?,outputs=?,evidence=?,confidence=?,source=?,source_run_id=?,updated_at=?,content_hash=?,trust_level=? WHERE id=?",
+            self._q("UPDATE skills SET name=?,version=?,status=?,triggers=?,contraindications=?,preconditions=?,workflow=?,termination=?,outputs=?,evidence=?,verification=?,confidence=?,source=?,source_run_id=?,updated_at=?,content_hash=?,trust_level=? WHERE id=?",
                     (name, version, final_status, json.dumps(list(triggers), ensure_ascii=False),
                      json.dumps(list(contraindications), ensure_ascii=False), json.dumps(list(preconditions), ensure_ascii=False),
                      json.dumps(list(workflow), ensure_ascii=False, default=str), termination,
                      json.dumps(list(outputs), ensure_ascii=False), json.dumps(list(evidence), ensure_ascii=False, default=str),
+                     json.dumps(list(verification), ensure_ascii=False, default=str),
                      float(max(0.0, min(1.0, confidence))), source, source_run_id, now, chash, trust_level, sid))
         else:
-            self._q("INSERT INTO skills(key,name,version,status,triggers,contraindications,preconditions,workflow,termination,outputs,evidence,confidence,success_count,failure_count,source,source_run_id,created_at,updated_at,content_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            self._q("INSERT INTO skills(key,name,version,status,triggers,contraindications,preconditions,workflow,termination,outputs,evidence,verification,confidence,success_count,failure_count,source,source_run_id,created_at,updated_at,content_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (key, name, 1, status, json.dumps(list(triggers), ensure_ascii=False),
                       json.dumps(list(contraindications), ensure_ascii=False), json.dumps(list(preconditions), ensure_ascii=False),
                       json.dumps(list(workflow), ensure_ascii=False, default=str), termination,
                       json.dumps(list(outputs), ensure_ascii=False), json.dumps(list(evidence), ensure_ascii=False, default=str),
+                      json.dumps(list(verification), ensure_ascii=False, default=str),
                       float(max(0.0, min(1.0, confidence))), 0, 0, source, source_run_id, now, now, chash))
         return self.get(key)
 
@@ -151,22 +182,24 @@ class SkillBank:
             conn.close()
 
     def get(self, key: str) -> SkillCandidate:
-        rows = self._q("SELECT key,name,version,status,triggers,contraindications,preconditions,workflow,termination,outputs,evidence,confidence,success_count,failure_count,source,source_run_id,updated_at FROM skills WHERE key=?", (key,))
+        rows = self._q(
+            "SELECT key,name,version,status,triggers,contraindications,preconditions,workflow,termination,outputs,evidence,verification,confidence,success_count,failure_count,source,source_run_id,updated_at FROM skills WHERE key=?",
+            (key,),
+        )
         if not rows:
             raise KeyError(key)
         row = rows[0]
-        return SkillCandidate(row[0], row[1], int(row[2]), row[3], tuple(json.loads(row[4])),
-                              tuple(json.loads(row[5])), tuple(json.loads(row[6])), tuple(json.loads(row[7])),
-                              row[8], tuple(json.loads(row[9])), tuple(json.loads(row[10])), float(row[11]),
-                              int(row[12]), int(row[13]), row[14], row[15], row[16])
+        return SkillCandidate(
+            row[0], row[1], int(row[2]), row[3], tuple(json.loads(row[4])),
+            tuple(json.loads(row[5])), tuple(json.loads(row[6])), tuple(json.loads(row[7])),
+            row[8], tuple(json.loads(row[9])), tuple(json.loads(row[10])), float(row[12]),
+            int(row[13]), int(row[14]), row[15], row[16], row[17], tuple(json.loads(row[11])),
+        )
 
     def list(self, status: str | None = None) -> list[SkillCandidate]:
-        # Fetch complete rows in one connection. Skill retrieval sits on the hot planning
-        # path, so the previous N+1 ``SELECT key`` + ``get(key)`` pattern became visible
-        # once structural skill matching was evaluated for every TaskIR request.
         sql = (
             "SELECT key,name,version,status,triggers,contraindications,preconditions,workflow,"
-            "termination,outputs,evidence,confidence,success_count,failure_count,source,source_run_id,updated_at FROM skills"
+            "termination,outputs,evidence,verification,confidence,success_count,failure_count,source,source_run_id,updated_at FROM skills"
         )
         params = ()
         if status:
@@ -177,8 +210,8 @@ class SkillBank:
         return [SkillCandidate(
             row[0], row[1], int(row[2]), row[3], tuple(json.loads(row[4])),
             tuple(json.loads(row[5])), tuple(json.loads(row[6])), tuple(json.loads(row[7])),
-            row[8], tuple(json.loads(row[9])), tuple(json.loads(row[10])), float(row[11]),
-            int(row[12]), int(row[13]), row[14], row[15], row[16]
+            row[8], tuple(json.loads(row[9])), tuple(json.loads(row[10])), float(row[12]),
+            int(row[13]), int(row[14]), row[15], row[16], row[17], tuple(json.loads(row[11])),
         ) for row in rows]
 
     def match(self, goal: str, limit: int = 5) -> list[SkillCandidate]:

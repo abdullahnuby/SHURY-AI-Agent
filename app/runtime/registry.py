@@ -53,6 +53,12 @@ class Tool:
     # Decision-relevant information contract used to estimate the value of an information action.
     information_domains: tuple[str, ...] = ()
     information_gain_prior: float = 0.0
+    # Organization metadata: the tool declares its bounded operational ownership.
+    # Routing consumes this metadata; it never maps individual tool names to departments.
+    organization_department: str | None = None
+    organization_role: str | None = None
+    # Optional explicit governance classification; when absent, governance derives it from the tool contract.
+    governance_class: str | None = None
 
     def matches(self, goal: str) -> bool:
         # A custom matcher is authoritative: returning False must remain a hard negative.
@@ -109,6 +115,9 @@ class Tool:
             "exploration_safe": self.exploration_safe,
             "information_domains": list(self.information_domains),
             "information_gain_prior": self.information_gain_prior,
+            "organization_department": self.organization_department,
+            "organization_role": self.organization_role,
+            "governance_class": self.governance_class,
         }
 
 

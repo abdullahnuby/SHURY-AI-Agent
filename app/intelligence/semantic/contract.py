@@ -21,11 +21,13 @@ class SemanticContract:
     text: str = ""
     normalized: str = ""
     language: str = "other"
+    language_variant: str = "unknown"
     domain: str = "general"
     conversation_class: str = "TASK"
     speech_act: str = "request"
     actionability: str = "action"
     intent: str = ""
+    capability: str = ""
     operation: str = ""
     canonical_goal: str = ""
     target: str = ""
@@ -57,6 +59,10 @@ class SemanticContract:
             data[key] = list(data[key])
         data["slots"] = dict(data["slots"])
         return data
+
+    @property
+    def slots_dict(self) -> dict[str, str]:
+        return dict(self.slots)
 
     @property
     def executable_operation(self) -> str:
@@ -98,9 +104,9 @@ def _conversation_class(parse: SemanticParse) -> str:
     memory_write = {"remember_fact", "remember_memory", "remember_result", "remember_last_result", "forget_fact"}
     memory_read = {"recall_fact", "memory_search", "memory_profile", "memory_stats", "history"}
     research = {"web_research", "scientific_research", "open_world_learning", "rag_reasoning", "agentic_rag"}
-    analysis = {"data_analysis", "workspace_reasoning"}
+    analysis = {"data_analysis", "workspace_reasoning", "workspace_inventory", "workspace_recursive_inventory", "workspace_file_organization", "workspace_duplicate_cleanup"}
     information = {"query_knowledge", "knowledge_query", "query_capabilities", "capabilities", "query_time", "time"}
-    execution = {"calculate", "development_validation", "development_inspection", "development_git", "skill_acquisition", "skill_lifecycle", "project_task", "skill_query", "skill_discovery"}
+    execution = {"calculate", "project_audit", "development_validation", "development_inspection", "development_git", "skill_acquisition", "skill_lifecycle", "project_task", "skill_query", "skill_discovery"}
 
     if intent in social:
         return "SOCIAL"
@@ -144,11 +150,13 @@ def from_parse(parse: SemanticParse) -> SemanticContract:
         text=parse.original,
         normalized=parse.normalized,
         language=parse.language,
+        language_variant=getattr(parse, "language_variant", "unknown"),
         domain=parse.domain,
         conversation_class=_conversation_class(parse),
         speech_act=parse.speech_act,
         actionability=parse.actionability,
         intent=intent,
+        capability=str(top.capability if top else ""),
         operation=operation,
         canonical_goal=parse.canonical_goal,
         target=target,

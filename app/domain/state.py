@@ -21,3 +21,6 @@ class AgentState:
     replans: int = 0
     checkpointed: bool = False
     semantic_parse: Any | None = None
+    company_assignments: list[dict] = field(default_factory=list)
+    company_coordination: dict = field(default_factory=dict)
+    company_review: dict | None = None

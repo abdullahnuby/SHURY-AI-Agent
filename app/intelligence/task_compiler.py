@@ -19,6 +19,7 @@ from app.planning.capabilities import INTENT_TO_CAPABILITY
 
 _INTENT_GOAL = {
     "time": "what time is it",
+    "project_audit": "audit project",
     "development_validation": "check project",
     "development_inspection": "inspect project",
     "development_git": "git status",
@@ -35,6 +36,8 @@ _INTENT_GOAL = {
     "open_world_learning": "research and learn",
     "workspace_reasoning": "analyze workspace",
     "data_analysis": "analyze data",
+    "cross_department_data_move": "run cross-department data workflow",
+    "cross_department_sales_report_move": "run cross-department sales ranking and report workflow",
     "agentic_rag": "agentic retrieval",
     "rag_reasoning": "retrieve evidence from the knowledge base",
     "memory_search": "search my memory",
@@ -66,6 +69,8 @@ def _query_from_slots(parse: SemanticParse) -> str:
 
 
 _SURFACE_INTENTS = (
+    ("workspace_file_organization", ("organize the files in the workspace", "sort the workspace files", "classify and move the workspace files", "arrange files by type", "move files into folders", "رتب ملفات مساحة العمل", "رتب الملفات", "نظم الملفات", "صنف الملفات وانقلها", "انقل الملفات حسب النوع")),
+    ("workspace_inventory", ("workspace inventory", "inventory the files", "list all files in the workspace", "file inventory", "حصر الملفات", "احصر الملفات", "جرد الملفات")),
     ("development_inspection", ("inspect the project", "inspect project", "inspect the repo", "inspect repository", "analyze the project", "حلل المشروع", "افحص المشروع", "حلل الريبو", "افحص الريبو")),
     ("development_validation", ("verify the repo", "verify repository", "verify the build", "passes its checks", "pass its checks", "run the tests", "the tests", "tests", "test project", "check the project", "build the project", "اختبر المشروع", "شغل الاختبارات", "افحص build", "تحقق من المشروع")),
     ("list_notes", ("list my notes", "show my notes", "display my notes", "اعرض الملاحظات", "اعرض ملاحظاتي")),
@@ -120,7 +125,7 @@ def _planner_goal_for(parse: SemanticParse, original: str | None = None, intent_
     if intent in {"web_research", "scientific_research", "github_discovery", "github_learning", "skill_discovery", "skill_selection", "skill_routing"}:
         query = _query_from_slots(parse)
         return f"{base} {query}".strip() if query else source if base == "" else base
-    if intent in {"development_validation", "development_inspection"}:
+    if intent in {"project_audit", "development_validation", "development_inspection"}:
         path = next((e.text for e in parse.entities if e.type in {"file", "repository"}), "")
         return f"{base} {path}".strip() if path else base
     if intent in {"save_note", "list_notes", "list_skills", "skill_inventory", "recall_fact"}:
@@ -266,7 +271,28 @@ def _condition_from_text(text: str) -> TaskCondition | None:
 
 
 def compile_task_ir(parse: SemanticParse, world: Any = None) -> TaskIR:
-    """Compile a semantic parse into a conservative, inspectable task graph."""
+    """Compile a semantic parse/frame into a conservative, inspectable task graph."""
+    # The canonical Brain already stores a normalized SemanticFrame. Accept it directly
+    # at this boundary instead of invoking the NLP parser a second time. This preserves
+    # the single-model-load/single-semantic-pass invariant and gives Company synthesis a
+    # structured input even when there is no full SemanticParse object.
+    if not hasattr(parse, "original"):
+        text = str(getattr(parse, "text", "") or "").strip()
+        operation = str(getattr(parse, "requested_operation", "") or "").strip()
+        capability = str(getattr(parse, "requested_operation", "") or getattr(parse, "domain", "") or "").strip()
+        slots = {str(k): v for k, v in (getattr(parse, "slots", ()) or ())}
+        objective = str(getattr(parse, "object_text", "") or getattr(parse, "canonical_goal", "") or text).strip()
+        node = TaskNode(
+            id="t1", objective=objective or text, planner_goal=objective or text, kind="action",
+            intent=operation, capability=capability, arguments=slots, depends_on=(),
+            relation="root", success_conditions=((f"intent:{operation}",) if operation else ()),
+            confidence=1.0,
+        )
+        return TaskIR(
+            original=text, objective=objective or text, nodes=[node] if capability or objective or text else [],
+            conditions=[], constraints={}, assumptions=[], unresolved=list(getattr(parse, "uncertainty", ()) or ()),
+            planner_goal=objective or text, confidence=1.0,
+        )
     original = parse.original.strip()
     parts = _split_compound(original)
     nodes: list[TaskNode] = []

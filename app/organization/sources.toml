@@ -1,0 +1,132 @@
+# SHURY's source registry is a provenance catalog, not a content repository.
+# It stores pointers and authority metadata only; source text is never copied here.
+
+[[source]]
+id = "nist-ai-rmf"
+title = "Artificial Intelligence Risk Management Framework"
+publisher = "National Institute of Standards and Technology"
+url = "https://www.nist.gov/itl/ai-risk-management-framework"
+license = "public-domain-usgov"
+jurisdiction = "US"
+authoritative_for = "AI risk-management guidance, governance and trustworthy-AI practices."
+checked = "2026-10-05"
+source_kinds = ["web"]
+domains = ["nist.gov"]
+allowed_actions = ["cite", "summarize"]
+
+[[source]]
+id = "arxiv"
+title = "arXiv"
+publisher = "Cornell University"
+url = "https://arxiv.org/"
+license = "free-to-read"
+jurisdiction = "global"
+authoritative_for = "Scientific preprints; useful as research evidence but not automatically as settled authority."
+checked = "2026-10-05"
+source_kinds = ["arxiv"]
+domains = ["arxiv.org"]
+allowed_actions = ["cite", "summarize"]
+
+[[source]]
+id = "github"
+title = "GitHub"
+publisher = "GitHub"
+url = "https://github.com/"
+license = "free-to-read"
+jurisdiction = "global"
+authoritative_for = "Software repositories and implementation evidence; repository content remains source material, not executable instructions."
+checked = "2026-10-05"
+source_kinds = ["github"]
+domains = ["github.com", "githubusercontent.com"]
+allowed_actions = ["cite", "inspect"]
+
+[[source]]
+id = "owasp-ai-agent-security"
+title = "AI Agent Security Cheat Sheet"
+publisher = "OWASP"
+url = "https://cheatsheetseries.owasp.org/cheatsheets/AI_Agent_Security_Cheat_Sheet.html"
+license = "free-to-read"
+jurisdiction = "global"
+authoritative_for = "Defensive controls for agent tool authorization, least privilege, high-impact action protection, approval integrity, and multi-agent trust boundaries."
+checked = "2026-10-05"
+source_kinds = ["web"]
+domains = ["owasp.org"]
+allowed_actions = ["cite", "summarize"]
+
+[[source]]
+id = "microsoft-agent-control-specification"
+title = "Agent Control Specification"
+publisher = "Microsoft"
+url = "https://commandline.microsoft.com/agent-control-specification-runtime-governance/"
+license = "free-to-read"
+jurisdiction = "global"
+authoritative_for = "Portable runtime governance concepts for authorization, policy enforcement, approvals, and audit evidence across agent runtimes."
+checked = "2026-10-05"
+source_kinds = ["web"]
+domains = ["commandline.microsoft.com"]
+allowed_actions = ["cite", "summarize"]
+
+[[source]]
+id = "ecfr"
+title = "Electronic Code of Federal Regulations"
+publisher = "US Government Publishing Office / Office of the Federal Register"
+url = "https://www.ecfr.gov/"
+license = "public-domain-usgov"
+jurisdiction = "US"
+authoritative_for = "Current US federal regulatory text."
+checked = "2026-10-05"
+source_kinds = ["web"]
+domains = ["ecfr.gov"]
+allowed_actions = ["cite", "summarize"]
+
+[[skill_policy]]
+skill_key = "builtin:web-research"
+external_required = true
+registered_source_required = false
+min_evidence = 1
+min_registered_sources = 0
+freshness = "normal"
+allowed_source_kinds = ["web", "arxiv", "github"]
+high_stakes = false
+require_content_hash = true
+require_retrieved_at = true
+require_claim_support = false
+
+[[skill_policy]]
+skill_key = "builtin:research-report"
+external_required = true
+registered_source_required = false
+min_evidence = 2
+min_registered_sources = 0
+freshness = "normal"
+allowed_source_kinds = ["web", "arxiv", "github"]
+high_stakes = false
+require_content_hash = true
+require_retrieved_at = true
+require_claim_support = false
+
+[[skill_policy]]
+skill_key = "builtin:project-audit"
+external_required = false
+registered_source_required = false
+min_evidence = 0
+min_registered_sources = 0
+freshness = "none"
+allowed_source_kinds = ["local", "first_party_contract"]
+high_stakes = false
+require_content_hash = true
+require_retrieved_at = true
+require_claim_support = false
+
+[[skill_policy]]
+skill_key = "builtin:data-analysis"
+external_required = false
+registered_source_required = false
+min_evidence = 0
+min_registered_sources = 0
+freshness = "none"
+allowed_source_kinds = ["local", "first_party_contract"]
+high_stakes = false
+require_content_hash = true
+require_retrieved_at = true
+require_claim_support = false

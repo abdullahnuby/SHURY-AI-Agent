@@ -95,6 +95,7 @@ class SemanticParse:
     original: str
     normalized: str
     language: str
+    language_variant: str = "unknown"
     domain: str = "general"
     canonical_goal: str = ""
     intent_candidates: list[IntentCandidate] = field(default_factory=list)
@@ -126,6 +127,7 @@ class SemanticParse:
             "original": self.original,
             "normalized": self.normalized,
             "language": self.language,
+            "language_variant": self.language_variant,
             "domain": self.domain,
             "canonical_goal": self.canonical_goal,
             "intent_candidates": [x.to_dict() for x in self.intent_candidates],

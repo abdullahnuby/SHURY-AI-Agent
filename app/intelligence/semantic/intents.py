@@ -25,7 +25,7 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "multiply numbers", "divide numbers", "add numbers", "subtract numbers", "how much is 25 divided by 5",
         "what is 12 times 7", "subtract 9 from 20", "divide 81 by 9", "multiply 5 by 6", "add 3 and 4",
         "احسب عملية حسابية", "احسب ضرب قسمة جمع طرح", "اضرب", "اقسم", "اطرح", "اجمع"
-    ), "system"),
+    ), "calculate"),
     "time": ((
         "what time is it", "tell me the current time", "what is the date", "current time right now",
         "what day is today", "الساعة كام", "الوقت كام", "ما هو الوقت الحالي",
@@ -130,6 +130,22 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "analyze the workspace", "inspect all files in the workspace", "join these files", "compare multiple data files",
         "analyze a folder of files", "حلل المجلد", "اربط البيانات بين الملفات"
     ), "analysis"),
+    "workspace_file_organization": ((
+        "organize the files in the workspace", "sort the workspace files", "classify and move the workspace files",
+        "arrange files by type", "organize files by type", "move files into folders",
+        "رتب ملفات مساحة العمل", "رتب الملفات", "نظم ملفات مساحة العمل", "نظم الملفات",
+        "صنف الملفات وانقلها", "انقل الملفات حسب النوع", "رتب الملفات حسب النوع"
+    ), "workspace"),
+    "workspace_duplicate_cleanup": ((
+        "find duplicate files by content", "duplicate content", "deduplicate workspace", "duplicate cleanup",
+        "sha256 duplicates", "archive duplicate files", "ابحث عن الملفات المتطابقة", "النسخ المتطابقة",
+        "نفس المحتوى", "أرشيف التكرارات", "تنظيف التكرارات"
+    ), "workspace"),
+    "workspace_inventory": ((
+        "inventory the files in the workspace", "list all files in the workspace", "enumerate files in the workspace",
+        "file inventory", "workspace inventory", "قائمة ملفات مساحة العمل", "جرد الملفات", "جرد ملفات مساحة العمل",
+        "حصر الملفات", "احصر الملفات", "احصر ملفات مساحة العمل", "حصر ملفات مساحة العمل"
+    ), "workspace"),
     "development_validation": ((
         "run the tests and build the project", "verify the repository still compiles", "validate the project",
         "check whether the codebase passes its tests", "run the project's checks",
@@ -138,6 +154,16 @@ ROUTES: dict[str, tuple[tuple[str, ...], str]] = {
         "check whether the project is ready for production",
         "اختبر المشروع وابنيه", "تحقق من ان المشروع يبني", "هل المشروع جاهز للاطلاق",
         "هل المشروع جاهز للإطلاق", "فحص جاهزية الاطلاق", "فحص جاهزية الإنتاج"
+    ), "development"),
+    "research_report": ((
+        "research and compare recent papers and save a report", "compare recent research papers and create a report",
+        "research report on agent memory", "find recent papers and compare architectures",
+        "ابحث عن أحدث الأبحاث وقارن بينها واحفظ تقريرًا", "ابحث عن أبحاث حديثة عن ذاكرة الوكلاء وقارنها"
+    ), "research"),
+    "project_audit": ((
+        "audit the project", "full project audit", "audit this repository", "project audit", "repository audit",
+        "audit the repository", "افحص المشروع بالكامل", "راجع المشروع بالكامل", "دقق المشروع", "تدقيق المشروع",
+        "مراجعة كاملة للمشروع", "اعمل تدقيق للمشروع"
     ), "development"),
     "development_inspection": ((
         "inspect this repository", "understand the project architecture", "what stack does this project use",
@@ -310,10 +336,58 @@ def candidates(text: str) -> list[IntentCandidate]:
                 "retrieval-semantic",
             )
 
+    # A grounded arithmetic expression plus an explicit calculation cue is a
+    # capability-level semantic invariant. Retrieval may improve recall, but it
+    # must not override an executable calculation signal with memory/research routes.
+    normalized_text = normalize(text)
+    has_arithmetic_expression = bool(re.search(r"(?<!\w)\d+(?:\s*[+\-*/%^x×÷]\s*\d+)+", normalized_text))
+    has_calculation_cue = bool(re.search(
+        r"(?:^|\s)(?:احسب|حساب|اضرب|اقسم|اطرح|اجمع|calculate|compute|multiply|divide|add|subtract)(?:\s|$)",
+        normalized_text, re.I,
+    ))
+    explicit_result_save = bool(re.search(
+        r"(?:save|store|remember|احفظ|سجل).*(?:result|output|النتيجة|الناتج)",
+        normalized_text, re.I,
+    ))
+    if has_arithmetic_expression and has_calculation_cue and not explicit_result_save:
+        existing = by_name.get("calculate")
+        evidence = tuple(dict.fromkeys((existing.evidence if existing else ()) + (
+            "numeric-expression", "explicit-calculation-capability"
+        )))
+        by_name["calculate"] = IntentCandidate(
+            "calculate", 0.99, evidence, "calculate",
+            existing.required_slots if existing else (), existing.missing_slots if existing else (),
+            "semantic-router",
+        )
+        for name in ("remember_result", "remember_last_result", "recall_last_result", "remember_memory", "memory_search"):
+            item = by_name.get(name)
+            if item is not None:
+                by_name[name] = IntentCandidate(
+                    item.name, min(item.confidence, 0.08), item.evidence + ("calculation-capability-priority",),
+                    item.capability, item.required_slots, item.missing_slots, "semantic-router",
+                )
+
     # Retrieval similarity alone is not sufficient evidence for a GitHub task.
     # In particular, repository names and project descriptions must not imply GitHub.
     if not re.search(r"\bgithub\b", normalize(text), re.I):
         by_name.pop("github_learning", None)
+
+    # Explicit external research structure must dominate fuzzy project-audit retrieval.
+    # A workspace output path is an artifact destination, not evidence that the user is
+    # auditing the project.
+    ntext = normalize(text)
+    external_research = bool(re.search(r"(?:الإنترنت|الانترنت|الويب|اونلاين|أونلاين|\bonline\b|\binternet\b|\bweb\b)", ntext, re.I))
+    research_topic = bool(re.search(r"(?:أبحاث|الأبحاث|أوراق|الأوراق|دراسات|بحث|research|papers|paper|literature|arxiv|memory|ذاكرة|وكلاء|agents?)", ntext, re.I))
+    research_report = bool(re.search(r"(?:تقرير|report|قارن|compare|اختر|choose|architectures?|معمار(?:ية|يتين)|best|أفضل)", ntext, re.I))
+    recent_research = bool(re.search(r"(?:أحدث|حديث(?:ة|ه)?|آخر\s+سنتين|recent|latest|newest|last\s+two\s+years)", ntext, re.I))
+    if external_research and research_topic:
+        for bad in ("project_audit", "development_inspection", "development_validation", "development_git", "github_learning"):
+            item = by_name.get(bad)
+            if item is not None:
+                by_name[bad] = IntentCandidate(item.name, min(item.confidence, 0.08), item.evidence + ("external-research-domain-demotion",), item.capability, item.required_slots, item.missing_slots, "semantic-router")
+        target_name = "research_report" if research_report else ("scientific_research" if recent_research else "web_research")
+        existing = by_name.get(target_name)
+        by_name[target_name] = IntentCandidate(target_name, max(0.98 if target_name == "research_report" else 0.96, existing.confidence if existing else 0.0), (existing.evidence if existing else ()) + ("typed-external-research-structure",), ROUTES[target_name][1], existing.required_slots if existing else (), existing.missing_slots if existing else (), "semantic-router")
 
     # Social turns are not fuzzy route families. Require a standalone phrase so
     # semantic similarity cannot turn an ordinary request into a social intent.

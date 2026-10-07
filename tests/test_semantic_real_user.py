@@ -194,3 +194,32 @@ def test_arabic_age_save_does_not_fall_through_to_note(tmp_path, monkeypatch):
     assert state.status == "completed"
     assert state.plan.steps[0].tool == "remember_fact"
     assert state.plan.steps[0].args == {"key": "age", "value": "30"}
+
+
+def test_real_user_prospective_report_reference_is_not_unresolved():
+    from app.intelligence.semantic.references import resolve_references
+
+    text = (
+        "حلل ملف workspace/sales.csv ثم أنشئ تقريرًا منظمًا واحفظه في "
+        "workspace/sales_report.md وبعد ذلك راجع التقرير وتأكد من أن الملف تم إنشاؤه."
+    )
+    refs = resolve_references(text, {}, [])
+    report = next(ref for ref in refs if ref.text.casefold() == "التقرير")
+    assert report.resolved is True
+    assert report.target == "workspace/sales_report.md"
+    assert "prospective artifact" in report.basis
+
+
+def test_real_user_compound_goal_with_prospective_report_is_not_blocked_by_reference_resolution():
+    from app.intelligence.semantic.references import resolve_references
+
+    text = (
+        "حلل ملف workspace/sales.csv ثم أنشئ تقريرًا منظمًا واحفظه في "
+        "workspace/sales_report.md وبعد ذلك راجع التقرير وتأكد أن الملف تم إنشاؤه."
+    )
+    refs = resolve_references(text, {}, [])
+    assert not any(ref.text.casefold() in {"ذلك", "ها"} for ref in refs)
+    assert not any(ref.text.casefold() == "ه" and not ref.resolved for ref in refs)
+    report = next(ref for ref in refs if ref.text.casefold() == "التقرير")
+    assert report.resolved is True
+    assert report.target == "workspace/sales_report.md"

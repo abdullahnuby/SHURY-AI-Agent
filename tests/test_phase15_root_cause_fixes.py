@@ -89,3 +89,12 @@ def test_successful_execution_records_learning_transition(tmp_path: Path):
     events = [event for event in result.state.trace if event.get("kind") == "learning_recorded"]
     assert events and events[-1]["transition_count"] == 1
     assert brain.learning.store.get_experience(result.run_id) is not None
+
+
+def test_brain_clarification_status_is_needs_user(tmp_path):
+    brain = _kernel(tmp_path)
+    result = brain.think("update it", session_id="clarify-status")
+    executed = brain._execute_result(result, approve=lambda *_: True)
+    assert executed.status == "needs_user"
+    assert executed.state.decision is not None
+    assert executed.state.decision.kind == "clarify"

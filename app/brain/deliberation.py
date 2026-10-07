@@ -22,13 +22,13 @@ def deliberate(state: CognitiveState) -> Decision:
             return Decision('execute', 0.98, 'previous result lookup is scoped to the active session',
                             capability=step.capability, tool=step.tool, candidates=candidates,
                             plan=tuple(state.plan), conclusion='session_result_lookup_required')
-        return Decision('retrieve', 0.91, 'identity query requires durable belief lookup', answer_source='beliefs', query='name')
+        return Decision('respond', 0.93, 'identity memory lookup returned no stored evidence', answer_source='memory', conclusion='memory_not_found')
 
     if op == 'query_memory':
         if state.evidence:
             return Decision('respond', 0.94, 'memory query grounded in canonical memory evidence', answer_source='memory',
                             evidence=tuple(state.evidence[:8]), conclusion=state.evidence[0].content)
-        return Decision('retrieve', 0.90, 'memory query requires belief retrieval', answer_source='beliefs', query=frame.text)
+        return Decision('respond', 0.93, 'canonical memory returned no matching user evidence', answer_source='memory', conclusion='memory_not_found')
 
     if op == 'query_capabilities':
         return Decision('respond', 0.96, 'capability and self-model state are available', answer_source='self_model',
@@ -43,7 +43,13 @@ def deliberate(state: CognitiveState) -> Decision:
         return Decision('clarify', 0.93, 'the requested object cannot be resolved from the current discourse state',
                         missing_information=tuple(dict.fromkeys(missing)))
 
-    if op in {'query_time', 'calculate', 'remember', 'forget_memory', 'skill_query', 'compound_calculate_remember', 'data_analysis', 'project_task', 'development_inspection', 'development_validation'}:
+    blocking = set(getattr(frame, 'uncertainty', ()) or ()) if frame else set()
+    if 'workspace_reference_outside_boundary' in blocking or 'workspace_destination_outside_boundary' in blocking:
+        return Decision('refuse', 0.99, 'local reference is outside the governed workspace boundary', missing_information=())
+    if 'workspace_reference_ambiguous' in blocking or 'destination_ambiguous' in blocking:
+        return Decision('clarify', 0.98, 'a required local reference has multiple candidates', missing_information=('workspace_reference',))
+
+    if op in {'query_time', 'calculate', 'remember', 'forget_memory', 'skill_query', 'compound_calculate_remember', 'data_analysis', 'data_analysis_report', 'file_read', 'workspace_inventory', 'workspace_recursive_inventory', 'workspace_file_organization', 'workspace_duplicate_cleanup', 'cross_department_data_move', 'cross_department_sales_report_move', 'research_report', 'project_task', 'project_audit', 'development_inspection', 'development_validation'}:
         if state.plan:
             step = state.plan[0]
             return Decision('execute', 0.98, 'goal grounded into a deterministic action with a concrete contract',

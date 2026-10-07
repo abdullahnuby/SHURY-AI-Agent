@@ -1,0 +1,331 @@
+SHURY V25.3.0-alpha1-company16 — Personal AI reasoning, research, analysis, and execution agent | /debug /tools /semantic <نص> /semantic-benchmark /agent <هدف> /brain /plan <هدف> /resume <run_id> /replay <run_id> /reliability /experience /memory <query> /memory-profile /memory-stats /memory-health /memory-consolidate /memory-cleanup /memory-benchmark /memory-export <path> /memory-import <path> /routines /world /world-benchmark /benchmark /v12-benchmark /v13-benchmark /v14-benchmark /v15-benchmark /v16-benchmark /v17-benchmark /v18-benchmark /v19-benchmark /v20-benchmark /v21-benchmark /discover-skills <query> /route-skills <query> /learn-skills <query> /install-skill <owner/repo> <path> /refresh-skill <key> /installed-skills /approve-skill <key> /skill-supply-status /learn <query> /learn-development <path> /research-status /research-memory <query> /research-source-learning <query> /skills /skill-match <goal> /skill-status <key> <status> /learn-project <path> /inspect-skill <path> /skill-meta <path> /skill-view <path> /skill-evidence <key> /analytics /algorithm-portfolio /workspace <path> /rag-index <path> /rag-memory-index /rag <query> /rag-stats /agentic-rag <query> /agentic-rag-benchmark /learning-status /brain-bootstrap /brain-ingest <path> /brain-stats /brain-match <text> /brain-procedures <text> /learning <goal> /evolve <skill-key> /rollback <skill-key> /self-improvement-benchmark /company /company-route <goal> /company-decompose <goal> /company-capabilities <goal> /company-schedule <goal> /company-team <goal> /company-project-create <id|name|objective|priority|horizon> /company-projects /company-project <id> /company-priorities /company-identities /company-memory <query> /company-memory-stats /company-governance <goal> /company-sources [skill] /company-skills [key|capability|department|role] /company-eval /agent-readiness /eval-suite [scenario.json] /eval-sim /eval-gate <baseline.json> <candidate.json> /seed <query> /seed-stats /deep-research <query> /web <query> /arxiv <query> /github-search <query> /fetch <url> /github <owner/repo> /network-status /project <path> /git-status <path> /check <path> exit
+
+> {
+  "project_id": "p1",
+  "name": "Alpha",
+  "objective": "Alpha objective",
+  "priority": 0.8,
+  "horizon": "short",
+  "status": "active",
+  "criticality": 0.5,
+  "metadata": {},
+  "version": 1,
+  "created_at": "2026-10-05T16:28:10+00:00",
+  "updated_at": "2026-10-05T16:28:10+00:00"
+}
+
+> {
+  "project_id": "p2",
+  "name": "Beta",
+  "objective": "Beta objective",
+  "priority": 0.4,
+  "horizon": "long",
+  "status": "active",
+  "criticality": 0.5,
+  "metadata": {},
+  "version": 1,
+  "created_at": "2026-10-05T16:28:10+00:00",
+  "updated_at": "2026-10-05T16:28:10+00:00"
+}
+
+> {
+  "projects": [
+    {
+      "project_id": "p1",
+      "name": "Alpha",
+      "objective": "Alpha objective",
+      "priority": 0.8,
+      "horizon": "short",
+      "status": "active",
+      "criticality": 0.5,
+      "metadata": {},
+      "version": 1,
+      "created_at": "2026-10-05T16:28:10+00:00",
+      "updated_at": "2026-10-05T16:28:10+00:00"
+    },
+    {
+      "project_id": "p2",
+      "name": "Beta",
+      "objective": "Beta objective",
+      "priority": 0.4,
+      "horizon": "long",
+      "status": "active",
+      "criticality": 0.5,
+      "metadata": {},
+      "version": 1,
+      "created_at": "2026-10-05T16:28:10+00:00",
+      "updated_at": "2026-10-05T16:28:10+00:00"
+    }
+  ]
+}
+
+> {
+  "projects": [
+    {
+      "project_id": "p1",
+      "priority_score": 0.655,
+      "priority": 0.8,
+      "criticality": 0.5,
+      "horizon": "short",
+      "active_task_count": 0,
+      "waiting_dependencies": 0
+    },
+    {
+      "project_id": "p2",
+      "priority_score": 0.395,
+      "priority": 0.4,
+      "criticality": 0.5,
+      "horizon": "long",
+      "active_task_count": 0,
+      "waiting_dependencies": 0
+    }
+  ]
+}
+
+> {
+  "specialists": [
+    {
+      "identity_key": "specialist:data:data-analyst",
+      "role_key": "data:data-analyst",
+      "department": "data",
+      "name": "Data Analyst",
+      "remit": "Profile, compare, aggregate, and verify local datasets.",
+      "skills": [
+        "builtin:data-analysis",
+        "builtin:data-analysis-report",
+        "builtin:calculate"
+      ],
+      "capabilities": [
+        "data-analysis",
+        "data-analysis-report",
+        "quantitative-analysis"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:data:head",
+      "role_key": "data:head",
+      "department": "data",
+      "name": "Head of Data",
+      "remit": "Own deterministic data analysis and evidence-backed analytical artifacts.",
+      "skills": [
+        "builtin:data-analysis",
+        "builtin:data-analysis-report",
+        "builtin:calculate"
+      ],
+      "capabilities": [
+        "data-analysis",
+        "data-analysis-report",
+        "quantitative-analysis"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:development:head",
+      "role_key": "development:head",
+      "department": "development",
+      "name": "Head of Development",
+      "remit": "Own software inspection, validation, implementation planning, and repository operations.",
+      "skills": [
+        "builtin:project-inspection",
+        "builtin:project-validation",
+        "builtin:project-audit"
+      ],
+      "capabilities": [
+        "project-inspection",
+        "project-validation",
+        "project-audit"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:development:project-engineer",
+      "role_key": "development:project-engineer",
+      "department": "development",
+      "name": "Project Engineer",
+      "remit": "Inspect and validate software projects using first-party tooling.",
+      "skills": [
+        "builtin:project-inspection",
+        "builtin:project-validation",
+        "builtin:project-audit"
+      ],
+      "capabilities": [
+        "project-inspection",
+        "project-validation",
+        "project-audit"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:memory:head",
+      "role_key": "memory:head",
+      "department": "memory",
+      "name": "Head of Memory",
+      "remit": "Own canonical memory retrieval, storage, consolidation, and experience continuity.",
+      "skills": [
+        "builtin:remember",
+        "builtin:forget",
+        "builtin:identity-recall",
+        "builtin:memory-search"
+      ],
+      "capabilities": [
+        "memory-write",
+        "memory-forget",
+        "memory-recall",
+        "identity-recall"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:memory:steward",
+      "role_key": "memory:steward",
+      "department": "memory",
+      "name": "Memory Steward",
+      "remit": "Maintain memory integrity and provide grounded continuity evidence.",
+      "skills": [
+        "builtin:remember",
+        "builtin:forget",
+        "builtin:identity-recall",
+        "builtin:memory-search"
+      ],
+      "capabilities": [
+        "memory-write",
+        "memory-forget",
+        "memory-recall",
+        "identity-recall"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:operations:file-specialist",
+      "role_key": "operations:file-specialist",
+      "department": "operations",
+      "name": "File Operations Specialist",
+      "remit": "Inspect, classify, move, archive, and verify workspace files.",
+      "skills": [
+        "builtin:workspace-inventory",
+        "builtin:workspace-recursive-inventory",
+        "builtin:workspace-file-organization",
+        "builtin:workspace-duplicate-cleanup",
+        "builtin:file-read"
+      ],
+      "capabilities": [
+        "workspace-files",
+        "workspace-inventory",
+        "workspace-movement",
+        "file_read"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:operations:head",
+      "role_key": "operations:head",
+      "department": "operations",
+      "name": "Head of Operations",
+      "remit": "Own local workspace and filesystem operations.",
+      "skills": [
+        "builtin:workspace-inventory",
+        "builtin:workspace-recursive-inventory",
+        "builtin:workspace-file-organization",
+        "builtin:workspace-duplicate-cleanup",
+        "builtin:file-read",
+        "builtin:time"
+      ],
+      "capabilities": [
+        "workspace-files",
+        "workspace-inventory",
+        "workspace-recursive-inventory",
+        "workspace-file-read",
+        "workspace-movement",
+        "time"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:research:head",
+      "role_key": "research:head",
+      "department": "research",
+      "name": "Head of Research",
+      "remit": "Own fresh external research, evidence collection, source grounding, and research reports.",
+      "skills": [
+        "builtin:web-research",
+        "builtin:research-report"
+      ],
+      "capabilities": [
+        "web-research",
+        "research-report",
+        "source-verification"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    },
+    {
+      "identity_key": "specialist:research:research-analyst",
+      "role_key": "research:research-analyst",
+      "department": "research",
+      "name": "Research Analyst",
+      "remit": "Collect and compare external evidence under source and recency constraints.",
+      "skills": [
+        "builtin:web-research",
+        "builtin:research-report"
+      ],
+      "capabilities": [
+        "web-research",
+        "research-report",
+        "source-verification"
+      ],
+      "total_attempts": 0,
+      "verified_successes": 0,
+      "verified_failures": 0,
+      "success_rate": 0.0,
+      "active_tasks": 0,
+      "workload_score": 0.0
+    }
+  ]
+}
+
+> 

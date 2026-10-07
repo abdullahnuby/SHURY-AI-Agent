@@ -10,10 +10,11 @@ from typing import FrozenSet
 
 GLOBAL_SYSTEM = "global_system"
 KNOWLEDGE = "knowledge"
+COMPANY = "company"
 USER = "user"
 SESSION = "session"
 RUN = "run"
-MEMORY_SCOPES = frozenset({GLOBAL_SYSTEM, KNOWLEDGE, USER, SESSION, RUN})
+MEMORY_SCOPES = frozenset({GLOBAL_SYSTEM, KNOWLEDGE, COMPANY, USER, SESSION, RUN})
 LEGACY_SCOPE_ALIASES = {"global": GLOBAL_SYSTEM}
 
 WORKING = "working"
@@ -27,6 +28,7 @@ PROCEDURE = "procedural"
 KNOWLEDGE_MEMORY = "knowledge"
 NOTE = "note"
 SYSTEM = "system"
+COMPANY_MEMORY = "company_memory"
 RUN_MEMORY = "run"
 
 CANONICAL_MEMORY_TYPES = frozenset({
@@ -41,6 +43,7 @@ CANONICAL_MEMORY_TYPES = frozenset({
     KNOWLEDGE_MEMORY,
     NOTE,
     SYSTEM,
+    COMPANY_MEMORY,
     RUN_MEMORY,
 })
 
@@ -123,6 +126,11 @@ MEMORY_TYPE_CONTRACTS: dict[str, MemoryTypeContract] = {
         False, False, False, "system lifetime", "system-owned writes only", "globally visible system lane",
         "system-controlled only", "system validity/expiry", 40,
     ),
+    COMPANY_MEMORY: MemoryTypeContract(
+        COMPANY_MEMORY, "Durable organizational memory for SHURY Company", "memory_items", frozenset({COMPANY}),
+        True, False, False, "long-term; evidence-dependent", "company-governed writes only", "same company organization",
+        "selective forget/correction under governance", "supersession + recency + evidence", 78,
+    ),
     RUN_MEMORY: MemoryTypeContract(
         RUN_MEMORY, "Execution-run scoped transient/durable evidence", "memory_items", frozenset({RUN}),
         True, True, True, "run lifetime", "explicit run-scoped write", "same owner + exact session + run",
@@ -143,6 +151,8 @@ def normalize_memory_type(value: str | None) -> str:
         "procedural_memory": PROCEDURE,
         "knowledge_memory": KNOWLEDGE_MEMORY,
         "run_memory": RUN_MEMORY,
+        "org_memory": COMPANY_MEMORY,
+        "company-memory": COMPANY_MEMORY,
     }
     return aliases.get(raw, raw)
 
@@ -200,6 +210,8 @@ def validate_memory_type_operation(
         raise ValueError(f"run_id is not valid for memory type {contract.memory_type!r} outside its run scope")
     if contract.memory_type in {KNOWLEDGE_MEMORY, SYSTEM} and source == "user":
         raise ValueError(f"memory type {contract.memory_type!r} cannot be written with user provenance")
+    if contract.memory_type == COMPANY_MEMORY and source != "system":
+        raise ValueError("company memory is system/company-governed and cannot use user or auto provenance")
     if contract.memory_type in {FACT, PREFERENCE} and not key:
         raise ValueError(f"memory type {contract.memory_type!r} requires a canonical key")
     if contract.memory_type == KNOWLEDGE_MEMORY and not str(key or "").strip():

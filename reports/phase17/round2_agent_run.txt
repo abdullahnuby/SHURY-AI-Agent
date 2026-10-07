@@ -1,2 +1,0 @@
-{"status": "BLOCKED_BY_ENVIRONMENT", "error": "omarelshehy/Arabic-Retrieval-v1.0 could not be loaded: RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'"}
-exit_code=2

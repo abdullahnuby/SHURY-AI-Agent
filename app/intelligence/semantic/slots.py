@@ -17,8 +17,8 @@ def extract_slots(text: str) -> dict[str, str]:
         (r"(?:my\s+job\s+is|my\s+work\s+is|my\s+profession\s+is|i\s+work\s+as|i\s+am\s+a(?:\s+\w+)?\s+\w|وظيفتي\s+هي|وظيفتي|مهنتي\s+هي|مهنتي|شغلتي|شغلي|انا\s+شغال|انا\s+بشتغل|بشتغل|انا\s+اعمل\s+ك|اعمل\s+ك)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:job"),
         # Generic explicit memory assignment. Specific patterns above still win because
         # they preserve canonical aliases such as name/city/origin.
-        (r"(?:save|store|remember|احفظ|سجل|افتكر|تذكر(?:\s+ان)?)\s+(?:this|that)\s+(?:information|fact|detail|المعلومة|المعلومة\s+دي|المعلومة\s+ده)\s*[:：=]\s*([^:：=,.!?؟\n]+)\s*[:：=]\s*([^,.!?؟\n]+)", "fact:generic"),
-        (r"(?:save|store|remember|احفظ|سجل|افتكر|تذكر(?:\s+ان)?)(?!\s+(?:this|that)\s+(?:information|fact|detail)\b)\s+([^:：=]+)\s*[:：=]\s*([^,.!?؟\n]+)", "fact:generic"),
+        (r"(?:save|store|remember|احفظ|سجل|سجّل|افتكر|تذكر|خزن|خزّن)(?:\s+ان)?\s+(?:this|that)\s+(?:information|fact|detail|المعلومة|المعلومة\s+دي|المعلومة\s+ده)\s*[:：=]\s*([^:：=,.!?؟\n]+)\s*[:：=]\s*([^,.!?؟\n]+)", "fact:generic"),
+        (r"(?:save|store|remember|احفظ|سجل|سجّل|افتكر|تذكر|خزن|خزّن)(?!\s+(?:this|that)\s+(?:information|fact|detail)\b)\s+([^:：=]+)\s*[:：=]\s*([^,.!?؟\n]+)", "fact:generic"),
         (r"(?:احفظ|سجل)\s+ان\s+(اسم\s+المشروع)\s+([^,.!?؟\n]+)", "fact:generic"),
         (r"(?:i\s*(?:[\'’]?m|am)\s+(?:originally\s+)?from|i\s+come\s+from|i\s+originally\s+from|i\s+was\s+born\s+in|انا\s+من|أنا\s+من|انا\s+اصلي\s+من|أنا\s+أصلي\s+من|انا\s+اتولدت\s+في|أنا\s+اتولدت\s+في)\s*[:=]?\s*([^,.!?؟\n]+)", "fact:origin"),
         (r"انا\s+(?:سني|عمري)\s+(\d{1,3})\s*(?:سنه|سنين|عام|اعوام)?", "fact:age"),
@@ -53,11 +53,13 @@ def extract_slots(text: str) -> dict[str, str]:
             continue
         value = next((g for g in m.groups() if g), "").strip(" .!?؟")
         if value:
-            # The dedicated arithmetic extractor is the canonical producer for
-            # operation:expression. Generic slot regexes may capture trailing
-            # politeness or mixed-language text, but must never overwrite a
-            # validated expression.
-            if key == "operation:expression" and slots.get(key):
+            # The dedicated arithmetic extractor is the only producer allowed
+            # to create an operation:expression slot. A generic "احسب ..."
+            # capture must never turn a natural-language data-analysis goal
+            # into a calculator expression.
+            if key == "operation:expression":
+                if slots.get(key):
+                    continue
                 continue
             slots[key] = value
     if re.fullmatch(r"(?:what(?:'s|\s+is)\s+my\s+(?:preferred|favorite)\s+theme|what\s+theme\s+do\s+i\s+prefer)", n, re.I):
@@ -73,10 +75,45 @@ def extract_slots(text: str) -> dict[str, str]:
     elif re.fullmatch(r"(?:where\s+am\s+i\s+from|where\s+do\s+i\s+come\s+from|what\s+is\s+my\s+origin|من\s+انا|انا\s+من\s+فين|انا\s+منين(?:\s+يا\s+شوري)?|انا\s+اصلي\s+منين|(?:فاكر|تفتكر)\s+(?:انا\s+)?(?:منين|من\s+فين))", question, re.I):
         slots["recall:key"] = "origin"
     if not slots.get("recall:key"):
+        generic_was = re.fullmatch(
+            r"(?:كان|كانت)\s+(?:ال)?(.+?)\s+(?:ايه|إيه)"
+            r"|(?:what|what's|what was)\s+(?:my\s+)?(.+?)",
+            question, re.I,
+        )
+        if generic_was:
+            raw_key = next((g for g in generic_was.groups() if g), "")
+            raw_key = raw_key.strip(" ?؟!.,:")
+            if raw_key and len(raw_key) <= 64:
+                slots["recall:key"] = normalize(raw_key).strip(" ?؟!.,:")
+
+    if not slots.get("recall:key") and re.search(
+        r"(?:ايه|إيه|ما|ماذا)\s+(?:الرقم|البيانات|المعلومة|الحاجة)\s+(?:اللي|التى|التي)\s+(?:قلتلك|قولتلك)|"
+        r"(?:قلتلك|قولتلك)\s+(?:ايه|إيه|الرقم)|"
+        r"(?:فاكر|تفتكر|افتكر)\s+(?:الرقم|المعلومة|الحاجة)\b|"
+        r"what\s+(?:was|did)\s+i\s+(?:tell|say)\s+you\b", n, re.I,
+    ):
+        slots["memory:query"] = n.strip(" ?؟")
+
+    if not slots.get("recall:key"):
         if re.search(r"(?:اين\s+(?:اعيش|اسكن)|فين\s+(?:ساكن|عايش)|(?:اعيش|اسكن)\s+فين|where\s+do\s+i\s+live|where\s+am\s+i\s+living)", n, re.I):
             slots["recall:key"] = "city"
         elif re.search(r"(?:انا\s+)?بشتغل\s+ايه|وظيفتي\s+ايه|شغلتي\s+ايه|مهنتي\s+ايه|ما\s+مهنتي|ما\s+وظيفتي|what\s+is\s+my\s+job|what\s+is\s+my\s+profession|what\s+do\s+i\s+do|do\s+you\s+remember\s+my\s+job", n, re.I):
             slots["recall:key"] = "job"
+    # `normalize()` intentionally canonicalizes case, but memory values are user data and
+    # must preserve their original spelling. Re-bind generic explicit assignments from the
+    # original text when the normalized slot already identified the same fact key.
+    generic_original = re.search(
+        r"(?:save|store|remember|احفظ|سجل|سجّل|افتكر|تذكر|خزن|خزّن)(?!\s+(?:this|that)\s+(?:information|fact|detail)\b)\s+([^:：=]+)\s*[:：=]\s*(.+?)\s*$",
+        text or "", re.I | re.S,
+    )
+    if generic_original:
+        original_key = generic_original.group(1).strip(" .!?؟:：=")
+        original_value = generic_original.group(2).strip(" .!?؟\r\n")
+        normalized_key = normalize(original_key).strip(" .!?؟:：=")
+        generic_slot = f"fact:{normalized_key}"
+        if normalized_key and original_value and generic_slot in slots:
+            slots[generic_slot] = original_value
+
     if slots.get("recall:key"):
         for key in tuple(slots):
             if key.startswith("fact:"):

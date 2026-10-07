@@ -1,18 +1,42 @@
 from app.runtime.registry import tool
-from app.runtime.security import safe_workspace_path
+from app.runtime.security import safe_project_path
 from app.integrations.devops import inspect_project, git_status, check_project
 import re
 
 
 def _path(goal: str) -> str:
-    quoted = re.findall(r'["\']([^"\']+)["\']', goal)
+    """Extract an explicit project-root path without confusing report/output paths for the root.
+
+    Natural-language tasks often mention a destination such as ``workspace/report.md``.
+    That is an output artifact, not the project being inspected. Therefore project paths are
+    accepted only when they are quoted, absolute, or explicitly introduced as the project
+    location/path. Otherwise the current workspace is the safe default.
+    """
+    text = str(goal or "").strip()
+    quoted = re.findall(r'["\']([^"\']+)["\']', text)
     if quoted:
-        return quoted[-1]
-    m = re.search(r'((?:[A-Za-z]:[\\/]|/)[^\n]+?)(?:\s+(?:عن|for|ثم|and)\s+|$)', goal)
-    if m:
-        return m.group(1).strip().rstrip('.,')
-    # No explicit path: use the current workspace. Passing the whole natural-language
-    # request as a filesystem path was a real routing bug.
+        for value in reversed(quoted):
+            value = value.strip()
+            if value:
+                return value
+
+    absolute = re.search(r'(?<![A-Za-z0-9_])((?:[A-Za-z]:[\\/]|/)[^\n,;]+?)(?:\s+(?:عن|for|ثم|and|with)\s+|$)', text)
+    if absolute:
+        return absolute.group(1).strip().rstrip('.,')
+
+    explicit_relative = re.search(
+        r'(?:project|repository|repo|codebase|project path|repository path|project at|repo at|codebase at|\bمشروع\b|\bالمشروع\b|\bالريبو\b|\bالمستودع\b)'
+        r'\s+(?:path|at|in|في|بمسار)?\s*([.]{1,2}[\\/][^\s,;]+|workspace[\\/][^\s,;]+)',
+        text,
+        re.I,
+    )
+    if explicit_relative:
+        candidate = explicit_relative.group(1).strip().rstrip('.,')
+        # A markdown/txt destination mentioned as the report artifact must not become the
+        # project root. Only treat relative paths that look like a directory as project roots.
+        if not re.search(r'\.(?:md|txt|csv|json|sqlite3?|db)$', candidate, re.I):
+            return candidate
+
     return "."
 
 
@@ -54,7 +78,7 @@ def _check_names(goal: str):
     information_domains=("development", "workspace"), information_gain_prior=0.88,
 )
 def inspect_project_tool(path: str):
-    return inspect_project(safe_workspace_path(path))
+    return inspect_project(safe_project_path(path))
 
 
 @tool(
@@ -75,7 +99,7 @@ def inspect_project_tool(path: str):
     information_domains=("development", "workspace"), information_gain_prior=0.76,
 )
 def git_status_tool(path: str):
-    return git_status(safe_workspace_path(path))
+    return git_status(safe_project_path(path))
 
 
 @tool(
@@ -97,4 +121,4 @@ def git_status_tool(path: str):
     intent_priority=7,
 )
 def check_project_tool(path: str, checks=None):
-    return check_project(safe_workspace_path(path), tuple(checks or ("git-diff-check", "compile")))
+    return check_project(safe_project_path(path), tuple(checks or ("git-diff-check", "compile")))

@@ -8,8 +8,8 @@ from .models import Reference
 
 REF_PATTERNS = [
     (r"\b(?:the\s+)?(?:last|previous)\s+result\b|\b(?:the\s+)?previous\s+output\b|\bالنتيجة\s+(?:السابقة|اللي فاتت)\b", "last_result"),
-    (r"\b(?:the\s+)?last\s+(?:one|thing)\b|\b(?:اللي فات|السابق|نفسه)\b", "prior_object"),
-    (r"\b(?:it|that|this|they|them|he|she)\b|\b(?:هو|هي|هم|ده|دي|هذا|هذه|هؤلاء|ذلك|تلك|نفسه|نفسها|ده اللي|دي اللي)\b", "pronoun"),
+    (r"\b(?:the\s+)?last\s+(?:one|thing)\b|\b(?:اللي فات|السابق|نفسه|نفسها|itself|themselves)\b", "prior_object"),
+    (r"\b(?:it|itself|that|this|they|them|themselves|he|she)\b|\b(?:هو|هي|هم|ده|دي|هذا|هذه|هؤلاء|ذلك|تلك|نفسه|نفسها|ده اللي|دي اللي)\b", "pronoun"),
     (r"\bthe\s+(?:report|file|project|document|repository|repo|dataset|papers?|articles?)\b|\b(?:التقرير|الملف|المشروع|المستند|المستودع|البيانات|الأبحاث|الأوراق)\s+(?:ده|السابق|اللي فات)?\b", "definite_entity"),
 ]
 
@@ -83,10 +83,71 @@ def _has_forward_antecedent(text: str, end: int) -> tuple[bool, str]:
     return bool(raw), raw
 
 
+_PROSPECTIVE_ARTIFACT_VERBS = re.compile(
+    r"(?:\b(?:create|generate|produce|write|save|make|prepare)\b|"
+    r"(?:أنشئ|انشئ|اعمل|اكتب|احفظ|جهز|جهّز|أنشأ|انشأ))", re.I,
+)
+_PROSPECTIVE_ARTIFACT_NOUNS = re.compile(
+    r"(?:report|file|document|dataset|تقرير|ملف|مستند|وثيقة|بيانات)", re.I,
+)
+_PROSPECTIVE_FILE_TOKEN = re.compile(
+    r"(?:[A-Za-z]:[\\/] |/)?[^\s,;!?؟]+\.(?:md|txt|json|csv|xlsx|pdf)\b", re.I | re.X
+)
+
+def _prospective_artifact_reference(text: str, start: int, raw: str) -> tuple[str, float, str, bool]:
+    """Ground references to artifacts that the same user goal explicitly creates earlier.
+
+    A compound request may say "create a report ... then review the report". The second
+    occurrence is prospective plan state, not an unresolved discourse anaphor. Treating it
+    as unresolved incorrectly aborts otherwise concrete multi-step goals before planning.
+    """
+    prefix = text[:start]
+    if not _PROSPECTIVE_ARTIFACT_VERBS.search(prefix) or not _PROSPECTIVE_ARTIFACT_NOUNS.search(prefix):
+        return "", 0.30, "no prospective artifact declaration", False
+    future_files = [m.group(0).strip(" \t,.;!?؟") for m in _PROSPECTIVE_FILE_TOKEN.finditer(text[start:])]
+    prior_files = [m.group(0).strip(" \t,.;!?؟") for m in _PROSPECTIVE_FILE_TOKEN.finditer(prefix)]
+    if future_files:
+        return future_files[0], 0.96, "prospective artifact path follows an explicit creation/save action", True
+    if prior_files:
+        return prior_files[-1], 0.95, "prospective artifact explicitly declared earlier in the same goal", True
+    return raw, 0.86, "prospective artifact explicitly created earlier in the same goal", True
+
+
+def _is_discourse_connective(text: str, match_start: int, raw: str) -> bool:
+    prefix = text[:match_start].rstrip()
+    if raw.casefold() == "ذلك" and re.search(r"(?:^|\s)[وف]?بعد$", prefix, re.I):
+        return True
+    if raw.casefold() == "that" and re.search(r"(?:after|then|and then)$", prefix, re.I):
+        return True
+    return False
+
+
 def _reference_is_task_deictic(text: str, raw: str) -> bool:
     if raw.casefold() in {"this", "that"} and re.search(r"\b(?:this|that)\s+(?:task|request|job|assignment|mission|query|problem)\b", text, re.I):
         return True
     return bool(re.search(r"\b(?:ال|لل|بال)?(?:مهمة|طلب|مطلوب|شغل|استفسار|مشكلة|موضوع)\s+(?:دي|ده|هذه|هذا|السابق)\b", text, re.I))
+
+
+def _nearest_reflexive_noun(text: str, start: int, raw: str) -> str | None:
+    """Resolve a reflexive used as a noun-phrase modifier, e.g. 'التقرير نفسه'.
+
+    A phrase like 'the report itself' / 'التقرير نفسه' is locally grounded by the noun
+    immediately preceding the reflexive. It is not the same kind of free discourse
+    anaphora as 'راجع هذا' or 'عدله', so it should not make a concrete task ambiguous.
+    """
+    prefix = text[:start]
+    if raw.casefold() in {"نفسه", "نفسها"}:
+        match = re.search(r"([\u0600-\u06ff]{2,})\s+$", prefix)
+    elif raw.casefold() in {"itself", "themselves"}:
+        match = re.search(r"(?:the|a|an)\s+([A-Za-z][A-Za-z0-9_-]*)\s+$", prefix, re.I)
+    else:
+        return None
+    if not match:
+        return None
+    noun = match.group(1).strip()
+    if noun in {"هو", "هي", "هم", "ده", "دي", "هذا", "هذه"}:
+        return None
+    return noun
 
 
 def _is_plural_reference(raw: str) -> bool:
@@ -145,6 +206,19 @@ def _pick_unique(candidates: list[_Candidate], raw: str) -> tuple[str, float, st
     return chosen.text, 0.83, "previous-turn antecedent", True
 
 
+_ARABIC_OBJECT_CLITIC_ACTION_STEMS = {
+    "احفظ", "حفظ", "راجع", "أنشئ", "انشئ", "أنشأ", "انشأ", "اكتب", "كتب",
+    "اقرأ", "اقرا", "افتح", "حلل", "حلّل", "افحص", "احسب", "ابحث", "قارن",
+    "نفذ", "نفّذ", "شغل", "شغّل", "احذف", "امسح", "عدّل", "عدل", "اعرض",
+    "استخرج", "اجمع", "رتب", "رتّب", "صنّف", "صنف", "جهز", "جهّز", "خزّن", "خزن",
+    "سجل", "سجّل", "انقل", "انقل", "حل", "راجع",
+}
+
+def _looks_like_action_with_object_clitic(stem: str) -> bool:
+    value = str(stem or "").casefold()
+    return any(value.startswith(prefix.casefold()) for prefix in _ARABIC_OBJECT_CLITIC_ACTION_STEMS)
+
+
 _ARABIC_CLITIC_FALSE_POSITIVES = {
     "عنده", "عندها", "عندهم", "معه", "معها", "معهم", "فيه", "فيها", "فيهم",
     "منه", "منها", "منهم", "عليه", "عليها", "عليهم", "ليه", "بيها", "بيهم",
@@ -160,6 +234,9 @@ def _attached_arabic_pronouns(text: str, *, protected_tokens: set[str] | None = 
         if token.casefold() in protected:
             continue
         if token in _ARABIC_CLITIC_FALSE_POSITIVES:
+            continue
+        stem = match.group("stem").lstrip("وف")
+        if not _looks_like_action_with_object_clitic(stem):
             continue
         found.append((match.group("clitic"), match.start(), match.end()))
     return found
@@ -183,6 +260,31 @@ def resolve_references(text: str, world: dict | object | None = None,
         for match in re.finditer(pattern, text, re.I):
             raw = match.group(0).strip()
 
+            # Arabic demonstratives can function as determiners inside an ordinary
+            # noun phrase (e.g. "هذا الحصر", "هذه القائمة", "ذلك الملف"). In that
+            # construction the demonstrative itself is not a standalone anaphoric
+            # reference that requires a previous discourse antecedent. A separate
+            # definite-entity pass can still ground the noun phrase when needed.
+            if kind == "pronoun" and raw.casefold() in {
+                "هذا", "هذه", "ذلك", "تلك", "ده", "دي"
+            }:
+                tail = text[match.end():]
+                if re.match(r"\s+ال[\u0600-\u06ff]{2,}\b", tail):
+                    continue
+
+            # Reflexives bound inside a noun phrase (e.g. "التقرير نفسه" / "the report
+            # itself") are locally grounded by the noun immediately before them. They do
+            # not require a previous-turn antecedent and must not block an otherwise
+            # concrete multi-step goal.
+            if kind in {"pronoun", "prior_object"}:
+                reflexive_target = _nearest_reflexive_noun(text, match.start(), raw)
+                if reflexive_target:
+                    out.append(Reference(
+                        raw, "pronoun", reflexive_target, True, 0.97,
+                        basis="same-phrase reflexive noun binding",
+                    ))
+                    continue
+
             # In Arabic copular questions, "هو/هي" is grammatical linking
             # rather than discourse anaphora (for example, "ما هو ...؟").
             # Do not manufacture unresolved reference state for that construction.
@@ -192,6 +294,8 @@ def resolve_references(text: str, world: dict | object | None = None,
                 continue
 
             # Discourse connectives / acknowledgements are not object references.
+            if _is_discourse_connective(text, match.start(), raw):
+                continue
             if kind == "pronoun" and raw.casefold() == "that" and re.match(
                 r"(?:remember|save|store|note)\s+that\b", text[:match.end()], re.I
             ):
@@ -254,6 +358,15 @@ def resolve_references(text: str, world: dict | object | None = None,
                         target, confidence, basis, resolved = _pick_unique(candidates, raw)
 
             elif kind == "definite_entity":
+                prospective_target, prospective_confidence, prospective_basis, prospective_resolved = _prospective_artifact_reference(
+                    text, match.start(), raw
+                )
+                if prospective_resolved:
+                    target, confidence, basis, resolved = (
+                        prospective_target, prospective_confidence, prospective_basis, True
+                    )
+                    out.append(Reference(raw, kind, target, resolved, confidence, basis=basis))
+                    continue
                 target = raw
                 prior_goal = last_goal.casefold()
                 grounded = any(token in prior_goal for token in (
@@ -271,6 +384,12 @@ def resolve_references(text: str, world: dict | object | None = None,
     # prepositional/adverbial forms; resolution uses the same candidate policy as
     # standalone pronouns, so ambiguity remains a clarification rather than a guess.
     for clitic, _start, _end in _attached_arabic_pronouns(text, protected_tokens=protected_tokens):
+        prospective_target, prospective_confidence, prospective_basis, prospective_resolved = _prospective_artifact_reference(
+            text, _start, clitic
+        )
+        if prospective_resolved:
+            out.append(Reference(clitic, "pronoun", prospective_target, True, prospective_confidence, basis=prospective_basis))
+            continue
         candidates = []
         local = _find_candidates(text, _start)
         if local:

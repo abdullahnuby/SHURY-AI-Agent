@@ -66,6 +66,6 @@
   "unique_task_signature_count": 64990,
   "sha256_jsonl_content": "ff3af2dd91dae7d3a029250c90533a82b4ba831200649447964003cd0f330eee",
   "sha256_db": "b4f919f356dcc0b121c27023dd6bc775dcc7728c77b54b40809ddb87c14da4c1",
-  "sha256_jsonl_gz": "33f0eb25c2b6768295423357f36767204780c83ef0f1445bb1d67fb85cb6b31b",
+  "sha256_jsonl_gz": "c8eacec1a2da1663459b226f236d3c4a1d1b1b72dba5db723e3c0818ace695ea",
   "policy": "seed examples are read-only priors; never treated as user memory, execution evidence, or promotion evidence"
 }

@@ -93,7 +93,7 @@ def main():
     version_file = Path(__file__).resolve().parents[2] / "VERSION"
     version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "unknown"
     identity = get_identity()
-    print(f"{identity.name} V{version} — {identity.role} | /debug /tools /semantic <نص> /semantic-benchmark /agent <هدف> /brain /plan <هدف> /resume <run_id> /replay <run_id> /reliability /experience /memory <query> /memory-profile /memory-stats /memory-health /memory-consolidate /memory-cleanup /memory-benchmark /memory-export <path> /memory-import <path> /routines /world /world-benchmark /benchmark /v12-benchmark /v13-benchmark /v14-benchmark /v15-benchmark /v16-benchmark /v17-benchmark /v18-benchmark /v19-benchmark /v20-benchmark /v21-benchmark /discover-skills <query> /route-skills <query> /learn-skills <query> /install-skill <owner/repo> <path> /refresh-skill <key> /installed-skills /approve-skill <key> /skill-supply-status /learn <query> /learn-development <path> /research-status /research-memory <query> /research-source-learning <query> /skills /skill-match <goal> /skill-status <key> <status> /learn-project <path> /inspect-skill <path> /skill-meta <path> /skill-view <path> /skill-evidence <key> /analytics /algorithm-portfolio /workspace <path> /rag-index <path> /rag-memory-index /rag <query> /rag-stats /agentic-rag <query> /agentic-rag-benchmark /learning-status /brain-bootstrap /brain-ingest <path> /brain-stats /brain-match <text> /brain-procedures <text> /learning <goal> /evolve <skill-key> /rollback <skill-key> /self-improvement-benchmark /eval-suite [scenario.json] /eval-sim /eval-gate <baseline.json> <candidate.json> /seed <query> /seed-stats /deep-research <query> /web <query> /arxiv <query> /github-search <query> /fetch <url> /github <owner/repo> /network-status /project <path> /git-status <path> /check <path> exit")
+    print(f"{identity.name} V{version} — {identity.role} | /debug /tools /semantic <نص> /semantic-benchmark /agent <هدف> /brain /plan <هدف> /resume <run_id> /replay <run_id> /reliability /experience /memory <query> /memory-profile /memory-stats /memory-health /memory-consolidate /memory-cleanup /memory-benchmark /memory-export <path> /memory-import <path> /routines /world /world-benchmark /benchmark /v12-benchmark /v13-benchmark /v14-benchmark /v15-benchmark /v16-benchmark /v17-benchmark /v18-benchmark /v19-benchmark /v20-benchmark /v21-benchmark /discover-skills <query> /route-skills <query> /learn-skills <query> /install-skill <owner/repo> <path> /refresh-skill <key> /installed-skills /approve-skill <key> /skill-supply-status /learn <query> /learn-development <path> /research-status /research-memory <query> /research-source-learning <query> /skills /skill-match <goal> /skill-status <key> <status> /learn-project <path> /inspect-skill <path> /skill-meta <path> /skill-view <path> /skill-evidence <key> /analytics /algorithm-portfolio /workspace <path> /rag-index <path> /rag-memory-index /rag <query> /rag-stats /agentic-rag <query> /agentic-rag-benchmark /learning-status /brain-bootstrap /brain-ingest <path> /brain-stats /brain-match <text> /brain-procedures <text> /learning <goal> /evolve <skill-key> /rollback <skill-key> /self-improvement-benchmark /company /company-route <goal> /company-routing <capability> /company-decompose <goal> /company-capabilities <goal> /company-schedule <goal> /company-team <goal> /company-project-create <id|name|objective|priority|horizon> /company-projects /company-project <id> /company-priorities /company-identities /company-memory <query> /company-memory-stats /company-governance <goal> /company-sources [skill] /company-skills [key|capability|department|role] /company-eval /company-improve-skill <skill-key>|<producer> /company-acquire-skill <key>|<name>|<source>|<producer>|<json-workflow> /company-changes /company-competency [capability]|[specialist] /company-change-regression <proposal_id> /company-change-monitor <proposal_id> /company-change-review <proposal_id>|approve|<reason> /company-skill-trust <proposal_id>|<reviewer>|<local|trusted>|<reason> /company-change-approve <proposal_id> /company-change-apply <proposal_id> /company-skill-rollback <skill-key>|<actor>|<reason> /agent-readiness /eval-suite [scenario.json] /eval-sim /eval-gate <baseline.json> <candidate.json> /seed <query> /seed-stats /deep-research <query> /web <query> /arxiv <query> /github-search <query> /fetch <url> /github <owner/repo> /network-status /project <path> /git-status <path> /check <path> exit")
     session_id = uuid.uuid4().hex
     pending_cognitive_goal: str | None = None
     debug_mode = False
@@ -131,6 +131,187 @@ def main():
             print(json.dumps({
                 "brain": "canonical-state-brain",
                 "semantic_nlp": model_status(),
+            }, ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-project-create "):
+            from app.organization import DEFAULT_COMPANY
+            raw = goal[len("/company-project-create "):].strip()
+            parts = [part.strip() for part in raw.split("|")]
+            if len(parts) < 3:
+                print("[company project create] use: /company-project-create id|name|objective|priority|horizon")
+            else:
+                try:
+                    priority = float(parts[3]) if len(parts) > 3 and parts[3] else 0.5
+                    horizon = parts[4] if len(parts) > 4 and parts[4] else "medium"
+                    project = DEFAULT_COMPANY.portfolio.create_project(parts[0], parts[1], parts[2], priority=priority, horizon=horizon)
+                    print(json.dumps(project.to_dict(), ensure_ascii=False, indent=2))
+                except Exception as e:
+                    print(f"[company project create failed] {e}")
+            continue
+        if goal == "/company-projects":
+            from app.organization import DEFAULT_COMPANY
+            print(json.dumps({"projects": [p.to_dict() for p in DEFAULT_COMPANY.portfolio.list_projects()]}, ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-project "):
+            from app.organization import DEFAULT_COMPANY
+            project_id = goal[len("/company-project "):].strip()
+            project = DEFAULT_COMPANY.portfolio.get_project(project_id)
+            if project is None:
+                print(json.dumps({"project_id": project_id, "found": False}, ensure_ascii=False, indent=2))
+            else:
+                print(json.dumps({"found": True, "project": project.to_dict(), "tasks": [t.to_dict() for t in DEFAULT_COMPANY.portfolio.list_tasks(project_id)]}, ensure_ascii=False, indent=2))
+            continue
+        if goal == "/company-priorities":
+            from app.organization import DEFAULT_COMPANY
+            print(json.dumps({"projects": list(DEFAULT_COMPANY.portfolio.reprioritize())}, ensure_ascii=False, indent=2))
+            continue
+        if goal == "/company-identities":
+            from app.organization import DEFAULT_COMPANY
+            print(json.dumps({"specialists": [x.to_dict() for x in DEFAULT_COMPANY.portfolio.all_specialist_identities(DEFAULT_COMPANY.registry)]}, ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-memory "):
+            requested = goal[len("/company-memory "):].strip()
+            from app.organization import CompanyMemory
+            print(json.dumps({"company_memory": [x.to_dict() for x in CompanyMemory().recall(requested)]}, ensure_ascii=False, indent=2, default=str))
+            continue
+        if goal == "/company-sources" or goal.startswith("/company-sources "):
+            from app.organization import CompanyEvidencePolicy
+            requested = goal[len("/company-sources"):].strip()
+            policy = CompanyEvidencePolicy()
+            if requested:
+                payload = {"skill_key": requested, "policy": policy.registry.policy_for_skill(requested).to_dict(), "sources": [x.to_dict() for x in policy.registry.list_sources()]}
+            else:
+                payload = policy.snapshot()
+            print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+            continue
+        if goal == "/company-eval":
+            try:
+                from app.evaluation import CompanyEvaluationSuite, company_release_gate
+                report = CompanyEvaluationSuite().evaluate()
+                print(json.dumps({"report": report.to_dict(), "gate": company_release_gate(report)}, ensure_ascii=False, indent=2, default=str))
+            except Exception as e:
+                print(f"[company evaluation failed] {e}")
+            continue
+
+        if goal == "/company-memory-stats":
+            from app.organization import CompanyMemory
+            print(json.dumps(CompanyMemory().stats(), ensure_ascii=False, indent=2, default=str))
+            continue
+        if goal.startswith("/company-governance "):
+            requested = goal[len("/company-governance "):].strip()
+            from app.brain import CognitiveKernel
+            from app.organization import DEFAULT_COMPANY, CompanyGovernance, GovernanceContext
+            result = CognitiveKernel().think(requested, session_id=session_id)
+            actions = getattr(result.state, 'plan', []) or []
+            assignments = getattr(result.state, 'company_assignments', []) or []
+            governance = CompanyGovernance(DEFAULT_COMPANY)
+            decisions = []
+            for action in actions:
+                assignment = next((a for a in assignments if str(a.get('step_id')) == str(action.step_id)), None)
+                if not assignment:
+                    decisions.append({'step_id': action.step_id, 'allowed': False, 'decision': 'deny', 'reasons': ['missing_company_assignment']})
+                    continue
+                context = GovernanceContext(
+                    task_id=f"company:{action.step_id}",
+                    department=str(assignment.get('department') or ''),
+                    specialist=str(assignment.get('specialist') or ''),
+                    skill_key=str(action.skill_key or assignment.get('skill_key') or ''),
+                    capability=str(action.capability or assignment.get('capability') or ''),
+                )
+                tool = result.runtime_state.registry.get(action.tool) if getattr(result, 'runtime_state', None) is not None and hasattr(result.runtime_state, 'registry') else None
+                if tool is None:
+                    tool = load_tools().get(action.tool)
+                if tool is None:
+                    decisions.append({'step_id': action.step_id, 'allowed': False, 'decision': 'deny', 'reasons': ['tool_not_registered'], 'tool': action.tool})
+                    continue
+                decisions.append({'step_id': action.step_id, 'tool': action.tool, **governance.evaluate(assignment, tool, context, action.args).to_dict()})
+            print(json.dumps({'goal': requested, 'status': result.status, 'governance': decisions}, ensure_ascii=False, indent=2, default=str))
+            continue
+        if goal.startswith("/company-team "):
+            requested = goal[len("/company-team "):].strip()
+            from app.brain import CognitiveKernel
+            result = CognitiveKernel().think(requested, session_id=session_id)
+            coordination = getattr(result.state, "company_coordination", {}) or {}
+            print(json.dumps({
+                "goal": requested,
+                "team": coordination.get("team_formation", {}),
+                "status": result.status,
+            }, ensure_ascii=False, indent=2))
+            continue
+        if goal == "/company":
+            from app.organization import DEFAULT_COMPANY
+            print(json.dumps(DEFAULT_COMPANY.snapshot(), ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-route "):
+            from app.organization import DEFAULT_COMPANY
+            requested = goal[len("/company-route " ):].strip()
+            from app.intelligence.semantic import semantic_understand
+            parsed = semantic_understand(requested, session_id=session_id)
+            assignment = DEFAULT_COMPANY.route(
+                requested, getattr(parsed, 'requested_operation', ''), '', risk='low', multi_step=True
+            )
+            print(json.dumps(assignment.to_dict(), ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-capabilities "):
+            requested = goal[len("/company-capabilities "):].strip()
+            from app.brain import CognitiveKernel
+            result = CognitiveKernel().think(requested, session_id=session_id)
+            print(json.dumps({
+                'goal': requested,
+                'capability_plan': getattr(result.state, 'company_capability_plan', {}),
+                'coordination': getattr(result.state, 'company_coordination', {}),
+                'plan': [step.to_dict() for step in getattr(result.state, 'plan', [])],
+                'status': result.status,
+            }, ensure_ascii=False, indent=2))
+            continue
+        if goal.startswith("/company-decompose "):
+            requested = goal[len("/company-decompose "):].strip()
+            from app.brain import CognitiveKernel
+            result = CognitiveKernel().think(requested, session_id=session_id)
+            print(json.dumps({
+                'goal': requested,
+                'coordination': getattr(result.state, 'company_coordination', {}),
+                'plan': [step.to_dict() for step in getattr(result.state, 'plan', [])],
+                'status': result.status,
+            }, ensure_ascii=False, indent=2))
+            continue
+
+        if goal == "/company-skills" or goal.startswith("/company-skills "):
+            from app.organization import DEFAULT_COMPANY, OrganizationSkillIndex
+            from app.skills.registry import SkillBank
+            query = goal[len("/company-skills"):].strip()
+            index = OrganizationSkillIndex(__import__('app.organization.catalog', fromlist=['OrganizationCatalog']).OrganizationCatalog.load(), SkillBank())
+            if not query:
+                profiles = []
+                for department in DEFAULT_COMPANY.departments:
+                    profiles.extend(index.skills_for_department(department.key))
+                payload = {"count": len({x.key for x in profiles}), "skills": [x.to_dict() for x in {x.key: x for x in profiles}.values()], "validation_errors": list(index.validate())}
+            else:
+                try:
+                    payload = index.skill(query).to_dict()
+                except KeyError:
+                    matches = index.skills_for_capability(query)
+                    if not matches and any(d.key == query for d in DEFAULT_COMPANY.departments):
+                        matches = index.skills_for_department(query)
+                    if not matches and any(r.key == query for r in DEFAULT_COMPANY.roles):
+                        matches = index.skills_for_role(query)
+                    payload = {"query": query, "matches": [x.to_dict() for x in matches], "validation_errors": list(index.validate())}
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            continue
+
+        if goal.startswith("/company-schedule "):
+            requested = goal[len("/company-schedule "):].strip()
+            from app.brain import CognitiveKernel
+            result = CognitiveKernel().think(requested, session_id=session_id)
+            coordination = getattr(result.state, 'company_coordination', {}) or {}
+            print(json.dumps({
+                'goal': requested,
+                'schedule': coordination.get('execution_schedule', []),
+                'serial_duration': coordination.get('schedule_serial_duration', 0.0),
+                'estimated_duration': coordination.get('schedule_estimated_duration', 0.0),
+                'max_parallelism': coordination.get('schedule_max_parallelism', 1),
+                'errors': coordination.get('schedule_errors', []),
+                'status': result.status,
             }, ensure_ascii=False, indent=2))
             continue
 
@@ -466,6 +647,143 @@ def main():
             except Exception as e:
                 print(f"[evolve failed] {e}")
             continue
+        if goal.startswith("/company-improve-skill "):
+            raw = goal[len("/company-improve-skill "):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 1)]
+                if len(parts) != 2 or not all(parts):
+                    raise ValueError("use: /company-improve-skill <skill-key>|<producer>")
+                key, producer = parts
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().propose_skill_promotion(key, producer=producer)
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company improve failed] {e}")
+            continue
+        if goal.startswith("/company-acquire-skill "):
+            raw = goal[len("/company-acquire-skill "):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 4)]
+                if len(parts) < 4:
+                    raise ValueError("use: /company-acquire-skill <key>|<name>|<source>|<producer>|<json-workflow>")
+                key, name, source, producer = parts[:4]
+                workflow = json.loads(parts[4]) if len(parts) == 5 and parts[4] else []
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().propose_skill_acquisition(
+                    key=key, name=name, source=source, producer=producer, workflow=workflow,
+                    evidence=[{"kind": "cli-source", "source": source, "verified": True}],
+                )
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company acquire failed] {e}")
+            continue
+        if goal.startswith("/company-routing "):
+            capability = goal[len("/company-routing "):].strip()
+            try:
+                from app.organization import DEFAULT_COMPANY
+                rows = DEFAULT_COMPANY.route_candidates(capability=capability)
+                print(json.dumps({"capability": capability, "candidates": [x.to_dict() for x in rows]}, ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company routing failed] {e}")
+            continue
+        if goal == "/company-competency" or goal.startswith("/company-competency "):
+            raw = goal[len("/company-competency"):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 1)] if raw else []
+                capability = parts[0] if parts and parts[0] else None
+                specialist = parts[1] if len(parts) == 2 and parts[1] else None
+                from app.learning.store import LearningStore
+                from app.organization import CompanyCompetencyCalibrator
+                print(json.dumps(CompanyCompetencyCalibrator(LearningStore()).snapshot(
+                    capability=capability, specialist=specialist
+                ), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company competency failed] {e}")
+            continue
+        if goal == "/company-changes":
+            try:
+                from app.organization import CompanySelfImprovementManager
+                print(json.dumps({"proposals": [p.to_dict() for p in CompanySelfImprovementManager().list()]}, ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company changes failed] {e}")
+            continue
+        if goal.startswith("/company-change-monitor "):
+            proposal_id = goal[len("/company-change-monitor "):].strip()
+            try:
+                from app.organization import CompanySelfImprovementManager
+                print(json.dumps(CompanySelfImprovementManager().monitor_change(proposal_id), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company change monitor failed] {e}")
+            continue
+        if goal.startswith("/company-change-regression "):
+            proposal_id = goal[len("/company-change-regression "):].strip()
+            try:
+                from app.organization import CompanySelfImprovementManager
+                print(json.dumps(CompanySelfImprovementManager().run_regression_gate(proposal_id), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company change regression failed] {e}")
+            continue
+        if goal.startswith("/company-change-review "):
+            raw = goal[len("/company-change-review "):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 2)]
+                if len(parts) < 2:
+                    raise ValueError("use: /company-change-review <proposal_id>|approve|<reason>")
+                proposal_id, decision = parts[:2]
+                reason = parts[2] if len(parts) > 2 else ""
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().security_review(
+                    proposal_id, reviewer="security:reviewer", approved=decision.casefold() == "approve", reason=reason
+                )
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company change review failed] {e}")
+            continue
+        if goal.startswith("/company-skill-trust "):
+            raw = goal[len("/company-skill-trust "):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 3)]
+                if len(parts) != 4 or not all(parts):
+                    raise ValueError("use: /company-skill-trust <proposal_id>|<reviewer>|<local|trusted>|<reason>")
+                proposal_id, reviewer, trust_level, reason = parts
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().grant_skill_trust(
+                    proposal_id, reviewer=reviewer, trust_level=trust_level, reason=reason
+                )
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company skill trust failed] {e}")
+            continue
+        if goal.startswith("/company-change-approve "):
+            proposal_id = goal[len("/company-change-approve "):].strip()
+            try:
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().approve(proposal_id)
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company change approval failed] {e}")
+            continue
+        if goal.startswith("/company-change-apply "):
+            proposal_id = goal[len("/company-change-apply "):].strip()
+            try:
+                from app.organization import CompanySelfImprovementManager
+                proposal = CompanySelfImprovementManager().apply(proposal_id)
+                print(json.dumps(proposal.to_dict(), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company change apply failed] {e}")
+            continue
+        if goal.startswith("/company-skill-rollback "):
+            raw = goal[len("/company-skill-rollback "):].strip()
+            try:
+                parts = [x.strip() for x in raw.split("|", 2)]
+                if len(parts) != 3 or not all(parts):
+                    raise ValueError("use: /company-skill-rollback <skill-key>|<actor>|<reason>")
+                key, actor, reason = parts
+                from app.organization import CompanySelfImprovementManager
+                print(json.dumps(CompanySelfImprovementManager().rollback_skill(key, actor=actor, reason=reason), ensure_ascii=False, indent=2))
+            except Exception as e:
+                print(f"[company skill rollback failed] {e}")
+            continue
         if goal.startswith("/rollback "):
             key = goal[len("/rollback "):].strip()
             if not key:
@@ -478,6 +796,13 @@ def main():
             continue
         if goal == "/self-improvement-benchmark":
             print(json.dumps(run_self_improvement_benchmark(), ensure_ascii=False, indent=2))
+            continue
+        if goal == "/agent-readiness":
+            from app.evaluation.training_readiness import evaluate_training_readiness
+            # This command intentionally reports a conservative gate. Passing regressions
+            # is not equivalent to being trained; live unseen-task evidence is required.
+            result = evaluate_training_readiness({1, 2, 3, 4})
+            print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
             continue
         if goal == "/eval-sim":
             try:

@@ -62,6 +62,10 @@ def compile_verified_run(state, memory, *, minimum_steps: int = 2):
         workflow=workflow,
         termination="stop after all steps verified or replan on failed postcondition",
         outputs=tuple(sorted({p for s in done for p in memory_plan_outputs(state, s)})),
+        verification=(
+            {"type": "all_steps_verified"},
+            {"type": "expected_effects_observed"},
+        ),
         evidence=evidence,
         confidence=confidence,
         source="verified-runtime",
@@ -99,6 +103,10 @@ def compile_project_skill(path: str, inspection: dict):
         workflow=workflow,
         termination="project inspection + git status + approved build/test checks verified",
         outputs=("project_inspected", "git_status_observed", "project_checked"),
+        verification=(
+            {"type": "all_steps_verified"},
+            {"type": "expected_effects_observed"},
+        ),
         evidence=evidence,
         confidence=0.7,
         source="project-manifest",

@@ -108,6 +108,8 @@ class GoalSpec:
     required_evidence: tuple[str, ...] = ()
     required_capability: str = ''
     priority: float = 0.5
+    project_id: str = ""
+    horizon: str = "medium"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -380,6 +382,17 @@ class CognitiveState:
     candidates: list[CandidateAction] = field(default_factory=list)
     selected_skill: Any = None
     selected_skills: list[Any] = field(default_factory=list)
+    company_assignment: dict[str, Any] = field(default_factory=dict)
+    company_assignments: list[dict[str, Any]] = field(default_factory=list)
+    company_coordination: dict[str, Any] = field(default_factory=dict)
+    company_capability_plan: dict[str, Any] = field(default_factory=dict)
+    company_execution_contexts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    company_active_context: dict[str, Any] = field(default_factory=dict)
+    company_memory: list[dict[str, Any]] = field(default_factory=list)
+    company_project_id: str = ''
+    company_project_context: dict[str, Any] = field(default_factory=dict)
+    company_portfolio: dict[str, Any] = field(default_factory=dict)
+    company_evidence: list[dict[str, Any]] = field(default_factory=list)
     plan: list[PlannedAction] = field(default_factory=list)
     uncertainties: list[str] = field(default_factory=list)
     observations: list[dict[str, Any]] = field(default_factory=list)
@@ -471,4 +484,15 @@ class CognitiveState:
             'decision': self.decision.to_dict() if self.decision else None,
             'revision': self.revision,
             'self_model': dict(self.self_model),
+            'company_assignment': dict(self.company_assignment),
+            'company_assignments': list(self.company_assignments),
+            'company_coordination': dict(self.company_coordination),
+            'company_capability_plan': dict(self.company_capability_plan),
+            'company_execution_contexts': dict(self.company_execution_contexts),
+            'company_active_context': dict(self.company_active_context),
+            'company_memory': list(self.company_memory),
+            'company_project_id': self.company_project_id,
+            'company_project_context': dict(self.company_project_context),
+            'company_portfolio': dict(self.company_portfolio),
+            'company_evidence': list(self.company_evidence),
         }

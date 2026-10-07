@@ -102,6 +102,15 @@ class MemoryController:
                 "knowledge": ("knowledge",),
                 "mixed_personal": ("durable_user_memory", "episodic"),
             }
+            # Durable user-memory intents are authoritative. A broad semantic frame may
+            # carry legacy/mixed memory types, but a direct fact/identity recall must not
+            # widen into episodic history because that can expose prior turns as if they
+            # were the requested stored fact (especially after the fact was forgotten).
+            if intent in {"query_identity", "query_memory"}:
+                return MemoryQueryPlan(
+                    derived.need, derived.memory_types, derived.stores, derived.rationale,
+                    float(getattr(frame_or_contract, "confidence", 1.0) or 1.0),
+                )
             if need != "none" or memory_types:
                 stores = store_map.get(need, derived.stores)
                 return MemoryQueryPlan(

@@ -28,4 +28,7 @@ def _match(goal: str) -> bool:
       pipe_source=True, pipe_label=lambda a: f"{a['expression']} = ",
       capability="calculate", produces=("calculation_completed",), cost=1.0, risk="low", idempotent=True, parallel_safe=True)
 def calculator(expression: str):
-    return _eval(ast.parse(expression.replace("^", "**"), mode="eval").body)
+    import re
+    expr = expression.replace('^', '**')
+    expr = re.sub(r'(?<![\w.])(\d+(?:\.\d+)?)%', r'(\1/100)', expr)
+    return _eval(ast.parse(expr, mode='eval').body)

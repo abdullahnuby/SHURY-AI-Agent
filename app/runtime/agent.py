@@ -38,6 +38,7 @@ from app.learning.manager import SelfImprovementManager
 from app.intelligence.task_compiler import compile_task_ir
 from app.runtime.response import compose_final_response
 from app.production.redaction import redact
+from app.organization import DEFAULT_COMPANY, review_company_execution
 
 LOG_FILE = Path(__file__).resolve().parents[1] / "logs" / "agent.jsonl"
 TERMINAL = {"cancelled", "blocked", "failed", "completed", "needs_user", "max_steps", "timeout"}
@@ -560,17 +561,62 @@ def run_agent(goal: str, approve: Callable[[str, dict], bool] = lambda t, a: Tru
     if errors:
         state.status, state.final_message = "failed", "خطة غير صالحة: " + " ; ".join(errors)
     else:
-        decision = decide(understanding, state.plan, registry, semantic=semantic)
-        _audit({"event": "decision", "action": decision.action, "confidence": decision.confidence,
-                "reason": decision.reason, "risk": decision.risk}, state.trace_id, state.run_id)
-        if decision.action == "clarify":
-            state.status, state.final_message = "needs_user", decision.reason
-        else:
-            _prepare_run(state, mem, session_id)
-            _execute(state, registry, mem, approve, max_replans=max_replans, context_goal=planning_goal)
+        try:
+            company_assignments = DEFAULT_COMPANY.route_plan(planning_goal, state.plan, tool_registry=registry)
+            state.company_assignments = [a.to_dict() for a in company_assignments]
+            state.company_coordination = DEFAULT_COMPANY.coordinate(planning_goal, company_assignments, tool_registry=registry).to_dict()
+            _audit({
+                "event": "company_executive_decomposition",
+                "workstreams": state.company_coordination.get('workstreams', []),
+                "execution_waves": state.company_coordination.get('execution_waves', []),
+                "handoffs": state.company_coordination.get('handoffs', []),
+                "critical_path": state.company_coordination.get('critical_path', []),
+                "validation_errors": state.company_coordination.get('validation_errors', []),
+            }, state.trace_id, state.run_id)
+            _audit({
+                "event": "company_workflow_delegation",
+                "assignments": state.company_assignments,
+                "coordination": state.company_coordination,
+            }, state.trace_id, state.run_id)
+            mem.record_event("company_workflow_delegation", {
+                "run_id": state.run_id, "assignments": state.company_assignments,
+            })
+        except Exception as exc:
+            state.status, state.final_message = "failed", f"تعذر تفويض الخطة داخل الشركة: {exc}"
+            _checkpoint(state, mem, state.status)
+        decision = decide(understanding, state.plan, registry, semantic=semantic) if state.status != "failed" else None
+        if decision is not None:
+            _audit({"event": "decision", "action": decision.action, "confidence": decision.confidence,
+                    "reason": decision.reason, "risk": decision.risk}, state.trace_id, state.run_id)
+            if decision.action == "clarify":
+                state.status, state.final_message = "needs_user", decision.reason
+            else:
+                _prepare_run(state, mem, session_id)
+                _execute(state, registry, mem, approve, max_replans=max_replans, context_goal=planning_goal)
 
     if state.plan is None:
         state.plan = Plan([])
+    if state.status == "completed" and state.company_assignments:
+        reviewed_operation = str(getattr(semantic_contract, "operation", "") or "")
+        if not reviewed_operation and getattr(semantic, "top_intent", None) is not None:
+            reviewed_operation = str(getattr(semantic.top_intent, "name", "") or "")
+        review = review_company_execution(
+            goal=goal,
+            operation=reviewed_operation,
+            plan=state.plan,
+            assignments=state.company_assignments,
+            status=state.status,
+            coordination=getattr(state, 'company_coordination', None),
+        )
+        state.company_review = review.to_dict()
+        mem.record_event("company_qa_review", {"run_id": state.run_id, **state.company_review})
+        _audit({"event": "company_qa_review", **state.company_review}, state.trace_id, state.run_id)
+        if not review.ok:
+            state.status = "failed"
+            state.final_message = review.reason
+        else:
+            state.final_message = review.final_message
+            state.plan.diagnostics["company_final_message"] = review.final_message
     # Convert machine output into a user-facing answer only after execution/verification
     # has completed. The composer is deterministic; it never invents unsupported facts.
     state.final_message = compose_final_response(

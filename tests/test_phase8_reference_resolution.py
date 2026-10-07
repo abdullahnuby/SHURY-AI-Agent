@@ -18,6 +18,43 @@ def _kernel(tmp_path: Path) -> CognitiveKernel:
     )
 
 
+def test_arabic_demonstrative_determiner_does_not_create_false_anaphora() -> None:
+    text = (
+        "افحص مجلد workspace الحالي. احصر الملفات الموجودة فيه مع اسم كل ملف ونوعه وحجمه، ثم "
+        "أنشئ ملفًا باسم workspace/file_inventory.md يحتوي على هذا الحصر في جدول منظم. بعد ذلك "
+        "اقرأ الملف الذي أنشأته وتحقق من أن عدد الملفات فيه يطابق عدد الملفات التي وجدتها فعليًا."
+    )
+    refs = resolve_references(text, {}, [])
+    false_anaphora = [
+        ref for ref in refs
+        if ref.text == "هذا" and not ref.resolved
+    ]
+    assert false_anaphora == []
+
+
+def test_arabic_reflexive_noun_phrase_does_not_create_false_anaphora() -> None:
+    text = (
+        "أنشئ تقريرًا باسم workspace/workspace_inventory.md، ثم اقرأ التقرير نفسه "
+        "وتحقق من النتائج."
+    )
+    refs = resolve_references(text, {}, [])
+    reflexive = [ref for ref in refs if ref.text == "نفسه"]
+    assert reflexive
+    assert reflexive[0].resolved is True
+    assert reflexive[0].target == "التقرير"
+    assert reflexive[0].basis == "same-phrase reflexive noun binding"
+
+
+def test_english_reflexive_noun_phrase_does_not_create_false_anaphora() -> None:
+    text = "Create the report at workspace/workspace_inventory.md, then read the report itself."
+    refs = resolve_references(text, {}, [])
+    reflexive = [ref for ref in refs if ref.text == "itself"]
+    assert reflexive
+    assert reflexive[0].resolved is True
+    assert reflexive[0].target == "report"
+    assert reflexive[0].basis == "same-phrase reflexive noun binding"
+
+
 def test_arabic_conjoined_candidates_keep_attached_pronoun_ambiguous() -> None:
     refs = resolve_references("راجع المشروع والمستودع وعدله", {}, [])
     attached = [ref for ref in refs if ref.text == "ه"]

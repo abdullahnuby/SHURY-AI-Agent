@@ -10,6 +10,7 @@ from app.brain import CognitiveKernel, BrainResult
 from app.knowledge.memory import LAST_RESULT_IGNORED_TOOLS, get_memory
 from app.planning.planner import RulePlanner
 from app.runtime.registry import load_tools
+from app.intelligence.semantic.contract import SemanticContract
 from app.world.store import load_session_world
 
 
@@ -72,7 +73,8 @@ def _brain_result_to_agent_state(result: BrainResult, goal: str, *, max_steps: i
         plan=Plan(
             steps=steps,
             planner=f"brain-{getattr(cognitive.decision, 'kind', 'core')}",
-            diagnostics={"semantic_engine": "arabic-retrieval-v1.0", "canonical_brain": True},
+            diagnostics={"semantic_engine": "arabic-retrieval-v1.0", "canonical_brain": True,
+                         "company_assignment": dict(runtime.get("company_assignment") or {})},
         ),
         final_message=str(result.response or ""),
         run_id=str(result.run_id or ""),
@@ -82,59 +84,33 @@ def _brain_result_to_agent_state(result: BrainResult, goal: str, *, max_steps: i
     return state
 
 
-def _semantic_to_structured_payload(goal: str, semantic: Any) -> dict[str, Any]:
-    """Convert validated Layer-2 semantics into the canonical GoalSpec gateway payload.
-
-    The conversion is deliberately mechanical: it preserves grounded slots/entities and does
-    not ask the model to select tools or actions. The Brain remains the only decision authority.
-    """
-    top = getattr(semantic, "top_intent", None)
-    operation = str(getattr(top, "name", "") or "").strip()
-    capability = str(getattr(top, "capability", "") or "").strip()
-    slots = dict(getattr(semantic, "slots", {}) or {})
-    # Layer-2 normalization is lowercase by design, but user-provided declarative values
-    # should retain their original representation when they are grounded by an entity.
-    if "fact:name" in slots:
-        for entity in getattr(semantic, "entities", ()) or ():
-            if str(getattr(entity, "type", "")) == "person" and str(getattr(entity, "text", "")).strip():
-                slots["fact:name"] = str(getattr(entity, "text")).strip()
-                break
-    target = ""
-    target_type = ""
-    for ref in getattr(semantic, "references", ()) or ():
-        if getattr(ref, "resolved", False) and getattr(ref, "target", ""):
-            target = str(ref.target)
-            target_type = "reference"
-            break
-    if not target:
-        for entity in getattr(semantic, "entities", ()) or ():
-            value = str(getattr(entity, "canonical", "") or getattr(entity, "normalized", "") or getattr(entity, "text", ""))
-            if value:
-                target = value
-                target_type = str(getattr(entity, "type", "") or "entity")
-                break
-    constraints = []
-    for item in getattr(semantic, "constraints", ()) or ():
-        constraints.append(f"{item.key} {item.operator} {item.value}")
-    temporal = []
-    for item in getattr(semantic, "temporal", ()) or ():
-        material = " -> ".join(x for x in (item.start, item.end) if x)
-        temporal.append(f"{item.kind}:{material or item.text}")
-    required_evidence = []
-    for item in getattr(semantic, "required_information", ()) or ():
-        required_evidence.append(str(item))
+def _semantic_to_structured_payload(contract: SemanticContract) -> dict[str, Any]:
+    """Convert the language-neutral SemanticContract into the Brain gateway payload."""
+    slots = contract.slots_dict
+    target = contract.target
+    target_type = "reference" if contract.reference else ""
+    if not target and contract.entities:
+        first_entity = contract.entities[0]
+        target = str(first_entity.get("canonical") or first_entity.get("normalized") or first_entity.get("text") or "")
+        target_type = str(first_entity.get("type") or "entity")
     return {
-        "goal": str(getattr(semantic, "canonical_goal", "") or goal).strip(),
-        "operation": operation,
-        "capability": capability,
+        "goal": str(contract.canonical_goal or contract.text).strip(),
+        "operation": str(contract.executable_operation).strip(),
+        "capability": str(contract.capability).strip(),
         "target": target,
         "target_type": target_type,
         "slots": slots,
-        "constraints": constraints,
-        "temporal_requirements": temporal,
-        "required_evidence": required_evidence,
+        "constraints": [
+            f"{item['key']} {item['operator']} {item['value']}"
+            for item in contract.constraints
+        ],
+        "temporal_requirements": [
+            f"{item['kind']}:{' -> '.join(x for x in (item.get('start', ''), item.get('end', '')) if x) or item.get('text', '')}"
+            for item in contract.temporal
+        ],
+        "required_evidence": list(contract.required_information),
         "priority": 0.5,
-        "language": str(getattr(semantic, "language", "en") or "en"),
+        "language": contract.language,
     }
 
 
@@ -229,17 +205,18 @@ def run_cognitive(
     semantic = SemanticInterpreter(pattern_cache=pattern_cache).parse(
         goal, mem=mem, world=world, registry=registry, session_id=session_id
     )
-    if semantic.needs_clarification:
+    semantic_contract = SemanticContract.from_parse(semantic)
+    if semantic_contract.needs_clarification:
         state = AgentState(goal=goal, status="needs_user", max_steps=max_steps, max_seconds=max_seconds)
         state.plan = Plan([], planner="retrieval-nlp-clarify", diagnostics={
             "semantic_engine": "arabic-retrieval-v1.0",
             "canonical_brain": True,
-            "semantic_parse": semantic.to_dict(),
+            "semantic_parse": semantic_contract.to_dict(),
         })
         state.final_message = semantic.clarification_question or "محتاج توضيح قبل التنفيذ."
         return state
 
-    payload = _semantic_to_structured_payload(goal, semantic)
+    payload = _semantic_to_structured_payload(semantic_contract)
     result = brain.act_structured(payload, approve=approve, session_id=session_id, max_steps=max_steps)
     _persist_brain_world_result(result, mem, session_id)
     state = _brain_result_to_agent_state(result, goal, max_steps=max_steps, max_seconds=max_seconds)
@@ -247,8 +224,8 @@ def run_cognitive(
         state.final_message = semantic.clarification_question
     state.plan.diagnostics.update({
         "semantic_engine": "arabic-retrieval-v1.0",
-        "semantic_source": semantic.source,
-        "semantic_confidence": semantic.confidence,
+        "semantic_source": semantic_contract.source,
+        "semantic_confidence": semantic_contract.confidence,
     })
     return state
 

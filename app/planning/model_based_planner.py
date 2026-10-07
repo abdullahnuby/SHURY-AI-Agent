@@ -93,6 +93,9 @@ class ModelPlanEvaluation:
     estimated_cost: float
     estimated_duration: float
     self_model_adjustment: float
+    learned_policy_value: float | None
+    learned_policy_evidence: int
+    selection_basis: str
     score: float
     simulation_depth: int
     rejected_by_certificate: bool = False
@@ -420,6 +423,39 @@ class ModelBasedPlanner:
             probability *= _clamp(float(step.success_probability))
         return probability
 
+    def _learned_policy_value(self, simulation: CounterfactualSimulation) -> tuple[float | None, int]:
+        """Return the persisted learned action-value policy for a complete sequence.
+
+        Multi-step plans use each simulated step's actual state signature before the action;
+        this prevents accidentally scoring every action against the root state. A plan is
+        policy-driven only when all simulated action decisions have at least two observed visits.
+        """
+        sequence = tuple(simulation.action_sequence)
+        if not sequence or not simulation.branches:
+            return None, 0
+        branch_values: list[tuple[float, float, int]] = []
+        for branch in simulation.branches:
+            values: list[float] = []
+            visits = 0
+            for simulated_step, action in zip(branch.steps, sequence):
+                try:
+                    prediction = self.value_model.predict_action(simulated_step.state_before, action)
+                except Exception:
+                    prediction = None
+                if prediction is None or int(prediction.visits) < 2:
+                    return None, visits
+                values.append(float(prediction.value) * float(prediction.confidence))
+                visits += int(prediction.visits)
+            if values:
+                branch_values.append((float(branch.probability), sum(values) / len(values), visits))
+        total_probability = sum(probability for probability, _, _ in branch_values)
+        if total_probability <= 0.0:
+            return None, 0
+        weighted = sum(probability * value for probability, value, _ in branch_values) / total_probability
+        evidence = max(0, int(round(sum(max(0.0, probability) * visits for probability, _, visits in branch_values)
+                                     / total_probability)))
+        return weighted, evidence
+
     def _evaluate_plan(self, plan: Plan, simulation: CounterfactualSimulation,
                        goal_progress: float, *, self_model_adjustment: float = 0.0) -> ModelPlanEvaluation:
         branches = tuple(simulation.branches)
@@ -461,7 +497,7 @@ class ModelBasedPlanner:
                     continue
         expected_prediction_error = _clamp(expected_prediction_error / max(1, len(simulation.action_sequence)))
         risk = sum(_risk_penalty(self.registry[s.tool].risk) for s in plan.steps if s.tool in self.registry)
-        score = (
+        heuristic_score = (
             4.0 * goal_progress
             + 1.50 * complete_probability
             + 1.25 * expected_return
@@ -477,6 +513,13 @@ class ModelBasedPlanner:
             - 0.035 * plan.estimated_cost
             - 0.005 * plan.estimated_duration
         )
+        learned_policy_value, learned_policy_evidence = self._learned_policy_value(simulation)
+        if learned_policy_value is not None:
+            score = learned_policy_value
+            selection_basis = "learned_action_values"
+        else:
+            score = heuristic_score
+            selection_basis = "model_metrics_cold_start"
         return ModelPlanEvaluation(
             action_signatures=self._sequence_key(simulation.action_sequence),
             goal_progress=goal_progress,
@@ -493,6 +536,9 @@ class ModelBasedPlanner:
             estimated_cost=float(plan.estimated_cost),
             estimated_duration=float(plan.estimated_duration),
             self_model_adjustment=float(self_model_adjustment),
+            learned_policy_value=(round(learned_policy_value, 6) if learned_policy_value is not None else None),
+            learned_policy_evidence=int(learned_policy_evidence),
+            selection_basis=selection_basis,
             score=float(score),
             simulation_depth=int(simulation.explored_depth),
         )
@@ -599,6 +645,9 @@ class ModelBasedPlanner:
                 "expected_discounted_return": evaluation.expected_discounted_return,
                 "expected_terminal_value": evaluation.expected_terminal_value,
                 "expected_behavior_value": evaluation.expected_behavior_value,
+                "learned_policy_value": evaluation.learned_policy_value,
+                "learned_policy_evidence": evaluation.learned_policy_evidence,
+                "selection_basis": evaluation.selection_basis,
                 "expected_prediction_error": evaluation.expected_prediction_error,
                 "expected_success_probability": evaluation.expected_success_probability,
                 "expected_path_confidence": evaluation.expected_path_confidence,
@@ -616,18 +665,28 @@ class ModelBasedPlanner:
                 "expanded_nodes": expanded_nodes,
                 "learned_action_sequences": len(completed_sequences),
             })
-        evaluations.sort(key=lambda item: (
-            item.evaluation.score,
-            item.evaluation.fully_supported_probability,
-            item.evaluation.expected_success_probability,
-            -item.evaluation.expected_uncertainty,
-            -item.plan.estimated_cost,
-            -item.plan.estimated_duration,
-            -len(item.plan.steps),
-        ), reverse=True)
+        if all(item.evaluation.learned_policy_value is not None for item in evaluations):
+            evaluations.sort(key=lambda item: (
+                float(item.evaluation.learned_policy_value or 0.0),
+                item.evaluation.expected_success_probability,
+                -item.evaluation.expected_uncertainty,
+                -item.plan.estimated_cost,
+                -item.plan.estimated_duration,
+                -len(item.plan.steps),
+            ), reverse=True)
+        else:
+            evaluations.sort(key=lambda item: (
+                item.evaluation.score,
+                item.evaluation.fully_supported_probability,
+                item.evaluation.expected_success_probability,
+                -item.evaluation.expected_uncertainty,
+                -item.plan.estimated_cost,
+                -item.plan.estimated_duration,
+                -len(item.plan.steps),
+            ), reverse=True)
         best = evaluations[0]
         best.plan.diagnostics["candidate_evaluations"] = [item.evaluation.to_dict() for item in evaluations[:8]]
-        best.plan.diagnostics["selection"] = "model-based-score-with-certificate"
+        best.plan.diagnostics["selection"] = best.evaluation.selection_basis
         return best.plan
 
     def evaluate_sequences(self, world: WorldState | str, goal: str,

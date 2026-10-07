@@ -22,7 +22,7 @@ from app.knowledge.memory_schema import (
     validate_memory_record_mapping,
 )
 from app.knowledge.memory_types import (
-    GLOBAL_SYSTEM, KNOWLEDGE, USER, SESSION, RUN, MEMORY_SCOPES, LEGACY_SCOPE_ALIASES,
+    GLOBAL_SYSTEM, KNOWLEDGE, COMPANY, USER, SESSION, RUN, MEMORY_SCOPES, LEGACY_SCOPE_ALIASES,
     CANONICAL_MEMORY_TYPES, validate_memory_type_operation, normalize_memory_type,
     ENTITY, RELATION,
 )
@@ -945,7 +945,7 @@ class Memory:
         effective_scope = LEGACY_SCOPE_ALIASES.get(str(scope).strip().lower(), str(scope).strip().lower()) if scope else USER
         if effective_scope not in MEMORY_SCOPES:
             raise ValueError(f"unsupported memory scope: {effective_scope}")
-        if owner_id is not None and current_owner is not None and str(owner_id) != str(current_owner):
+        if owner_id is not None and current_owner is not None and effective_scope != COMPANY and str(owner_id) != str(current_owner):
             raise PermissionError("owner_id conflicts with the active memory owner")
         if session_id is not None and current_session is not None and str(session_id) != str(current_session):
             raise PermissionError("session_id conflicts with the active memory session")
@@ -954,8 +954,8 @@ class Memory:
         effective_owner = str(owner_id or current_owner or self.default_owner_id)
         effective_session = session_id or current_session
         effective_run = run_id or current_run
-        if effective_scope in {USER, SESSION, RUN} and not effective_owner:
-            raise ValueError("owner_id is required for user/session/run memory")
+        if effective_scope in {COMPANY, USER, SESSION, RUN} and not effective_owner:
+            raise ValueError("owner_id is required for company/user/session/run memory")
         if effective_scope in {SESSION, RUN} and not effective_session:
             raise ValueError("session_id is required for session/run memory")
         if effective_scope == RUN and not effective_run:
@@ -971,7 +971,7 @@ class Memory:
                             session_id: str | None = None, run_id: str | None = None) -> tuple[str, tuple]:
         ctx = self._resolve_memory_context(scope=scope, owner_id=owner_id, session_id=session_id, run_id=run_id)
         parts=["scope=?"]; params:[str]=[str(ctx["scope"])]
-        if ctx["scope"] in {USER, SESSION, RUN}:
+        if ctx["scope"] in {COMPANY, USER, SESSION, RUN}:
             parts.append("owner_id=?"); params.append(str(ctx["owner_id"]))
         if ctx["scope"] in {SESSION, RUN}:
             parts.append("session_id=?"); params.append(str(ctx["session_id"]))

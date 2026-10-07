@@ -26,9 +26,14 @@ _OFFLINE_OPERATIONS = {
     "learning_intent": ("learning",),
     "self_improvement_research": ("learning", "research"),
     "project_task": ("project",),
+    "project_audit": ("project", "audit"),
+    "research_report": ("research", "report"),
     "development_validation": ("project", "validation"),
     "development_inspection": ("project", "inspection"),
     "data_analysis": ("data", "analysis"),
+    "data_analysis_report": ("data", "analysis", "report"),
+    "cross_department_data_move": ("data", "operations", "orchestration"),
+    "cross_department_sales_report_move": ("data", "operations", "orchestration"),
     "skill_query": ("skill",),
 }
 
@@ -98,6 +103,8 @@ def _normalize_operation(name: str, capability: str | None) -> str:
         "validate": "development_validation",
         "profile_dataset": "data_analysis",
         "analyze_dataset": "data_analysis",
+        "create_data_analysis_report": "data_analysis_report",
+        "create_project_audit_report": "project_audit",
     }
     return aliases.get(candidate, candidate)
 
@@ -196,6 +203,10 @@ def validate_structured_goal(payload: Mapping[str, Any]) -> tuple[GoalSpec, Sema
     )
     desired_state = success_conditions
     required_evidence = _string_tuple(payload.get("required_evidence"), field="required_evidence")
+    project_id = str(payload.get("project_id") or "").strip()
+    horizon = str(payload.get("horizon") or "medium").strip().casefold()
+    if horizon not in {"immediate", "short", "medium", "long"}:
+        raise ValueError("horizon must be immediate, short, medium or long")
     priority = payload.get("priority", 0.5)
     try:
         priority = max(0.0, min(1.0, float(priority)))
@@ -230,7 +241,10 @@ def validate_structured_goal(payload: Mapping[str, Any]) -> tuple[GoalSpec, Sema
         success_conditions=success_conditions,
         query=query,
         required_evidence=required_evidence,
+        required_capability=capability or name,
         priority=priority,
+        project_id=project_id,
+        horizon=horizon,
     )
     metadata = {
         "source": "structured_goal",
@@ -239,6 +253,8 @@ def validate_structured_goal(payload: Mapping[str, Any]) -> tuple[GoalSpec, Sema
         "parameters": parameters,
         "slots": slots,
         "priority": priority,
+        "project_id": project_id,
+        "horizon": horizon,
     }
     return goal, frame, metadata
 

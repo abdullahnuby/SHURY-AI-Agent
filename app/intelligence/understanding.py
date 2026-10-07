@@ -6,18 +6,12 @@ that tools can use as a semantic fallback when an exact trigger does not match.
 """
 from dataclasses import dataclass, field
 import re
-import unicodedata
-
-ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
-ALEF = str.maketrans("إأآٱ", "اااا")
-_ARABIC_DIACRITICS = r"[ًٌٍَُِّْـ]"
+from app.intelligence.language import normalize_text
 
 
 def normalize(text: str) -> str:
-    text = str(text or "").translate(ARABIC_DIGITS).translate(ALEF)
-    text = re.sub(_ARABIC_DIACRITICS, "", text)
-    text = re.sub(r"\s+", " ", text).strip().lower()
-    return unicodedata.normalize("NFKC", text)
+    """Canonical text normalization owned by the language boundary."""
+    return normalize_text(text)
 
 
 @dataclass(frozen=True)

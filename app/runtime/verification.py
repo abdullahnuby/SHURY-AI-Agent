@@ -9,9 +9,11 @@ class Verification:
     reason: str
 
 
-def verify_objective(plan, status: str) -> Verification:
+def verify_objective(plan, status: str, company_review: dict | None = None) -> Verification:
     if status != "completed":
         return Verification(False, "الخطة لم تكتمل")
+    if company_review is not None and not bool(company_review.get("ok")):
+        return Verification(False, "المراجع المستقل للشركة لم يثبت اكتمال الهدف")
     unfinished = [s.id for s in plan.steps if s.status != "done"]
     if unfinished:
         return Verification(False, f"خطوات غير مكتملة: {unfinished}")

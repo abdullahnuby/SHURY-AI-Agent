@@ -201,6 +201,12 @@ def compose_final_response(goal: str, semantic: Any, plan: Any, status: str, fal
     intent = _effective_intent(semantic, plan)
     status = str(status or "")
 
+    if status == "completed":
+        company_message = (getattr(getattr(plan, "diagnostics", {}), "get", lambda _k, _d=None: _d)("company_final_message", "")
+                           if getattr(plan, "diagnostics", None) is not None else "")
+        if company_message:
+            return company_message
+
     if status == "needs_user":
         return fallback or ("محتاج توضيح قبل التنفيذ." if arabic else "I need a clarification before I can execute that.")
     if status in {"failed", "blocked", "timeout"}:

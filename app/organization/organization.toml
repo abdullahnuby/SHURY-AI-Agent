@@ -1,0 +1,243 @@
+[organization]
+name = "SHURY Company"
+version = 1
+principle = "Build a real organization around ownership, capabilities, specialist roles, evidence, and independent review; scale departments only when a stable responsibility boundary exists."
+
+[[role]]
+key = "executive:chief-executive"
+name = "Chief Executive"
+department = "executive"
+parent = ""
+agent_class = "orchestrator"
+remit = "Own the company goal, delegate work, enforce authority boundaries, and integrate verified results."
+skills = []
+capabilities = ["company-orchestration", "goal-decomposition", "decision-integration"]
+write_surfaces = []
+runtime_domains = ["orchestration", "decision-integration"]
+authority = "autonomous"
+
+[[role]]
+key = "operations:head"
+name = "Head of Operations"
+department = "operations"
+parent = "executive:chief-executive"
+agent_class = "builder"
+remit = "Own local workspace and filesystem operations."
+skills = ["builtin:workspace-inventory", "builtin:workspace-recursive-inventory", "builtin:workspace-file-organization", "builtin:workspace-duplicate-cleanup", "builtin:file-read", "builtin:time"]
+capabilities = ["workspace-files", "workspace-inventory", "workspace-recursive-inventory", "workspace-file-read", "workspace-movement", "time"]
+write_surfaces = ["app/tools/system/files.py", "app/integrations/workspace.py"]
+runtime_domains = ["filesystem", "workspace"]
+authority = "autonomous"
+
+[[role]]
+key = "operations:file-specialist"
+name = "File Operations Specialist"
+department = "operations"
+parent = "operations:head"
+agent_class = "builder"
+remit = "Inspect, classify, move, archive, and verify workspace files."
+skills = ["builtin:workspace-inventory", "builtin:workspace-recursive-inventory", "builtin:workspace-file-organization", "builtin:workspace-duplicate-cleanup", "builtin:file-read"]
+capabilities = ["workspace-files", "workspace-inventory", "workspace-movement", "file_read"]
+write_surfaces = ["app/tools/system/files.py", "app/integrations/workspace.py"]
+runtime_domains = ["filesystem", "workspace"]
+authority = "autonomous"
+
+[[role]]
+key = "data:head"
+name = "Head of Data"
+department = "data"
+parent = "executive:chief-executive"
+agent_class = "builder"
+remit = "Own deterministic data analysis and evidence-backed analytical artifacts."
+skills = ["builtin:data-analysis", "builtin:data-analysis-report", "builtin:calculate"]
+capabilities = ["data-analysis", "data-analysis-report", "quantitative-analysis"]
+write_surfaces = ["app/knowledge/data_analysis.py", "app/services/data_analysis_service.py"]
+runtime_domains = ["datasets", "analytical-artifacts"]
+authority = "autonomous"
+
+[[role]]
+key = "data:data-analyst"
+name = "Data Analyst"
+department = "data"
+parent = "data:head"
+agent_class = "builder"
+remit = "Profile, compare, aggregate, and verify local datasets."
+skills = ["builtin:data-analysis", "builtin:data-analysis-report", "builtin:calculate"]
+capabilities = ["data-analysis", "data-analysis-report", "quantitative-analysis"]
+write_surfaces = ["app/knowledge/data_analysis.py", "app/services/data_analysis_service.py"]
+runtime_domains = ["datasets", "analytical-artifacts"]
+authority = "autonomous"
+
+[[role]]
+key = "research:head"
+name = "Head of Research"
+department = "research"
+parent = "executive:chief-executive"
+agent_class = "builder"
+remit = "Own fresh external research, evidence collection, source grounding, and research reports."
+skills = ["builtin:web-research", "builtin:research-report"]
+capabilities = ["web-research", "research-report", "source-verification"]
+write_surfaces = ["app/knowledge/web_research.py", "app/services/internet_service.py"]
+runtime_domains = ["network", "external-sources"]
+authority = "proposes"
+
+[[role]]
+key = "research:research-analyst"
+name = "Research Analyst"
+department = "research"
+parent = "research:head"
+agent_class = "builder"
+remit = "Collect and compare external evidence under source and recency constraints."
+skills = ["builtin:web-research", "builtin:research-report"]
+capabilities = ["web-research", "research-report", "source-verification"]
+write_surfaces = ["app/knowledge/web_research.py", "app/services/internet_service.py"]
+runtime_domains = ["network", "external-sources"]
+authority = "proposes"
+
+[[role]]
+key = "development:head"
+name = "Head of Development"
+department = "development"
+parent = "executive:chief-executive"
+agent_class = "builder"
+remit = "Own software inspection, validation, implementation planning, and repository operations."
+skills = ["builtin:project-inspection", "builtin:project-validation", "builtin:project-audit"]
+capabilities = ["project-inspection", "project-validation", "project-audit"]
+write_surfaces = ["app/integrations/devops.py"]
+runtime_domains = ["repository", "build-system", "tests"]
+authority = "proposes"
+
+[[role]]
+key = "development:project-engineer"
+name = "Project Engineer"
+department = "development"
+parent = "development:head"
+agent_class = "builder"
+remit = "Inspect and validate software projects using first-party tooling."
+skills = ["builtin:project-inspection", "builtin:project-validation", "builtin:project-audit"]
+capabilities = ["project-inspection", "project-validation", "project-audit"]
+write_surfaces = ["app/integrations/devops.py"]
+runtime_domains = ["repository", "build-system", "tests"]
+authority = "proposes"
+
+[[role]]
+key = "memory:head"
+name = "Head of Memory"
+department = "memory"
+parent = "executive:chief-executive"
+agent_class = "builder"
+remit = "Own canonical memory retrieval, storage, consolidation, and experience continuity."
+skills = ["builtin:remember", "builtin:forget", "builtin:identity-recall", "builtin:memory-search"]
+capabilities = ["memory-write", "memory-forget", "memory-recall", "identity-recall"]
+write_surfaces = ["app/knowledge/memory.py", "app/knowledge/memory_controller.py"]
+runtime_domains = ["memory", "experience"]
+authority = "autonomous"
+
+[[role]]
+key = "memory:steward"
+name = "Memory Steward"
+department = "memory"
+parent = "memory:head"
+agent_class = "builder"
+remit = "Maintain memory integrity and provide grounded continuity evidence."
+skills = ["builtin:remember", "builtin:forget", "builtin:identity-recall", "builtin:memory-search"]
+capabilities = ["memory-write", "memory-forget", "memory-recall", "identity-recall"]
+write_surfaces = ["app/knowledge/memory.py", "app/knowledge/memory_controller.py"]
+runtime_domains = ["memory", "experience"]
+authority = "autonomous"
+
+[[role]]
+key = "security:reviewer"
+name = "Security Reviewer"
+department = "security"
+parent = "executive:chief-executive"
+agent_class = "reviewer"
+remit = "Independently review risky or externally exposed actions and stop unsafe execution."
+skills = []
+capabilities = ["security-review"]
+write_surfaces = []
+runtime_domains = ["security", "permissions"]
+authority = "autonomous"
+
+[[role]]
+key = "qa:reviewer"
+name = "Quality Reviewer"
+department = "qa"
+parent = "executive:chief-executive"
+agent_class = "reviewer"
+remit = "Independently verify that claimed outcomes match the original goal and observed evidence."
+skills = []
+capabilities = ["quality-review", "evidence-verification"]
+write_surfaces = []
+runtime_domains = ["verification", "quality"]
+authority = "autonomous"
+
+[[department]]
+key = "operations"
+name = "Operations"
+head_agent = "operations:head"
+remit = "Filesystem and workspace execution."
+specialists = ["operations:file-specialist"]
+reviewer = "qa:reviewer"
+owned_capabilities = ["workspace-files", "workspace-inventory", "workspace-recursive-inventory", "workspace-file-read", "workspace-movement", "time", "workspace_inventory", "workspace_recursive_inventory", "workspace_file_organization", "workspace_duplicate_cleanup", "file_read", "query_time"]
+owned_effects = ["workspace_recursive_snapshot_observed", "workspace_snapshot_observed", "report_moved", "report_move_verified"]
+
+[[department]]
+key = "data"
+name = "Data"
+head_agent = "data:head"
+remit = "Deterministic data analysis and analytical evidence."
+specialists = ["data:data-analyst"]
+reviewer = "qa:reviewer"
+owned_capabilities = ["data-analysis", "data-analysis-report", "quantitative-analysis", "data_analysis", "data_analysis_report", "calculate"]
+owned_effects = ["csv_average_ranked", "sales_report_created", "data_analysis_observed", "company_data_report_created"]
+
+[[department]]
+key = "research"
+name = "Research"
+head_agent = "research:head"
+remit = "External evidence and research workflows."
+specialists = ["research:research-analyst"]
+reviewer = "qa:reviewer"
+owned_capabilities = ["web-research", "research-report", "source-verification", "research", "research_report", "learning_intent", "open_world_learning", "question_answering", "agentic_rag"]
+owned_effects = ["research_evidence_collected", "research_report_created", "answer_grounded", "grounded_answer", "verified_evidence", "research_trace"]
+
+[[department]]
+key = "development"
+name = "Development"
+head_agent = "development:head"
+remit = "Repository inspection and software validation."
+specialists = ["development:project-engineer"]
+reviewer = "qa:reviewer"
+owned_capabilities = ["project-inspection", "project-validation", "project-audit", "project_task", "project_audit", "development_inspection", "development_validation"]
+owned_effects = ["project_inspection_completed", "project_validation_completed"]
+
+[[department]]
+key = "memory"
+name = "Memory"
+head_agent = "memory:head"
+remit = "Canonical memory and continuity."
+specialists = ["memory:steward"]
+reviewer = "qa:reviewer"
+owned_capabilities = ["memory-write", "memory-forget", "memory-recall", "identity-recall", "remember", "remember_result", "remember_last_result", "forget_memory", "query_identity", "query_memory"]
+owned_effects = ["memory_written", "memory_recalled", "identity_recalled", "fact_saved"]
+
+[[department]]
+key = "security"
+name = "Security"
+head_agent = "security:reviewer"
+remit = "Independent security review."
+specialists = []
+reviewer = ""
+owned_capabilities = ["security-review"]
+owned_effects = []
+
+[[department]]
+key = "qa"
+name = "Quality"
+head_agent = "qa:reviewer"
+remit = "Independent quality and evidence review."
+specialists = []
+reviewer = ""
+owned_capabilities = ["quality-review", "evidence-verification"]
+owned_effects = []

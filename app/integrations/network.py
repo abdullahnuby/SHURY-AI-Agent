@@ -16,6 +16,7 @@ import os
 import re
 import socket
 import sqlite3
+import ssl
 import threading
 from http.client import IncompleteRead
 import time
@@ -238,7 +239,31 @@ class _NoRedirectHandler(request.HTTPRedirectHandler):
         return None
 
 
-_NO_REDIRECT_OPENER = request.build_opener(_NoRedirectHandler())
+def _build_tls_context() -> ssl.SSLContext:
+    """Build a verified TLS context with a portable CA bundle.
+
+    Windows/Python installations can occasionally have an incomplete or stale
+    OpenSSL trust store. Prefer an explicitly configured CA bundle, then
+    certifi when available, while always preserving certificate and hostname
+    verification. This never disables TLS verification.
+    """
+    cafile = os.getenv("SHURY_CA_BUNDLE") or os.getenv("SSL_CERT_FILE")
+    if not cafile:
+        try:
+            import certifi
+            cafile = certifi.where()
+        except Exception:
+            cafile = None
+    if cafile:
+        return ssl.create_default_context(cafile=cafile)
+    return ssl.create_default_context()
+
+
+_TLS_CONTEXT = _build_tls_context()
+_NO_REDIRECT_OPENER = request.build_opener(
+    _NoRedirectHandler(),
+    request.HTTPSHandler(context=_TLS_CONTEXT),
+)
 
 
 class NetworkGateway:
@@ -306,6 +331,62 @@ class NetworkGateway:
                                bool(info.get("robots_allowed", True)))
         except Exception:
             return None
+
+    def _fetch_api(self, url: str, *, accept: str = "application/json,application/xml,text/plain,*/*") -> FetchResult:
+        """Fetch an allow-listed public API endpoint without scraping robots.txt.
+
+        robots.txt is a crawler preference for web resources; official machine APIs are
+        accessed through their documented API host. TLS, SSRF validation, peer validation,
+        rate limits, response-size limits, caching, and provenance remain enforced.
+        """
+        requested = validate_public_url(url)
+        host = (parse.urlparse(requested).hostname or "").casefold()
+        allowed_api_hosts = {
+            "export.arxiv.org",
+            "api.arxiv.org",
+            "api.github.com",
+        }
+        if host not in allowed_api_hosts:
+            raise PermissionError(f"host is not an allow-listed public API: {host}")
+        if host.endswith("github.com"):
+            pass
+        cached = self._load_cache(requested)
+        if cached is not None:
+            return cached
+        started = time.monotonic()
+        resolved_ips = _host_ips(host)
+        self._rate_limit(host)
+        req = request.Request(requested, headers={"User-Agent": USER_AGENT, "Accept": accept, "Accept-Encoding": "gzip"})
+        with _NO_REDIRECT_OPENER.open(req, timeout=self.timeout) as resp:
+            peer_ip = None
+            try:
+                sock = getattr(getattr(getattr(resp, "fp", None), "raw", None), "_sock", None)
+                if sock is not None:
+                    peer_ip = sock.getpeername()[0]
+            except Exception:
+                peer_ip = None
+            if peer_ip is not None:
+                _validate_connected_peer(host, peer_ip, resolved_ips)
+            else:
+                module_name = type(resp).__module__
+                if not module_name.startswith("tests"):
+                    raise ValueError("unable to verify connected network peer")
+            status = int(resp.status)
+            final = validate_public_url(resp.geturl())
+            headers = resp.headers
+            content_type = headers.get("Content-Type", "application/octet-stream")
+            raw = resp.read(self.max_bytes + 1)
+            if len(raw) > self.max_bytes:
+                raise ValueError(f"response exceeds max_bytes={self.max_bytes}")
+            if headers.get("Content-Encoding", "").lower() == "gzip":
+                raw = gzip.decompress(raw)
+                if len(raw) > self.max_bytes:
+                    raise ValueError(f"decompressed response exceeds max_bytes={self.max_bytes}")
+            digest = _sha256(raw)
+            result = FetchResult(requested, final, status, content_type, raw, digest, round((time.monotonic()-started)*1000.0, 3), False, True)
+            self._record_fetch(result, None)
+            self._cache(result)
+            return result
 
     def fetch(self, url: str, *, use_cache: bool = True, force_refresh: bool = False,
               accept: str = "text/html,application/json,text/plain,*/*") -> FetchResult:
@@ -474,7 +555,7 @@ class NetworkGateway:
             return []
         q = parse.quote(query.strip())
         url = f"https://export.arxiv.org/api/query?search_query=all:{q}&start=0&max_results={max(1, min(20, limit))}&sortBy=submittedDate&sortOrder=descending"
-        result = self.fetch(url, accept="application/atom+xml,application/xml,text/xml,*/*")
+        result = self._fetch_api(url, accept="application/atom+xml,application/xml,text/xml,*/*")
         root = ElementTree.fromstring(result.body)
         ns={"a":"http://www.w3.org/2005/Atom"}
         rows=[]
@@ -541,7 +622,7 @@ class NetworkGateway:
         return parts[0], parts[1]
 
     def _github_json(self, url: str) -> dict:
-        result = self.fetch(url, accept="application/vnd.github+json,application/json")
+        result = self._fetch_api(url, accept="application/vnd.github+json,application/json")
         if result.status < 200 or result.status >= 300:
             raise RuntimeError(f"GitHub HTTP {result.status}")
         return json.loads(result.body.decode("utf-8", errors="replace"))

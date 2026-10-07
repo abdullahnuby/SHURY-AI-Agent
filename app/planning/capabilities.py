@@ -13,6 +13,7 @@ from typing import Any
 
 INTENT_TO_CAPABILITY: dict[str, str] = {
     "time": "time",
+    "project_audit": "project_audit",
     "development_validation": "development_validation",
     "development_inspection": "development_inspection",
     "development_git": "development_git",
@@ -29,6 +30,8 @@ INTENT_TO_CAPABILITY: dict[str, str] = {
     "web_research": "internet_research",
     "open_world_learning": "open_world_learning",
     "data_analysis": "data_analysis",
+    "cross_department_data_move": "cross_department_data_move",
+    "cross_department_sales_report_move": "cross_department_sales_report_move",
     "agentic_rag": "agentic_rag",
     "rag_reasoning": "rag_reasoning",
     "memory_search": "memory_search",

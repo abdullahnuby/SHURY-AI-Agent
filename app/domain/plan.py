@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, asdict
 import re
 from typing import Any
 
-REF = re.compile(r"\{\{(s\d+)\}\}")
+REF = re.compile(r"\{\{(s\d+)(?:\.[A-Za-z_][A-Za-z0-9_]*|\[[A-Za-z_][A-Za-z0-9_]*\])?\}\}")
 
 
 @dataclass
@@ -49,19 +49,29 @@ class Plan:
                    dict(payload.get("diagnostics", {})))
 
 
+REF_TOKEN = re.compile(r"\{\{(s\d+)(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[([A-Za-z_][A-Za-z0-9_]*)\])?\}\}")
+
+
 def refs_in(args: dict) -> set[str]:
-    return {m for v in args.values() if isinstance(v, str) for m in REF.findall(v)}
+    return {m.group(1) for v in args.values() if isinstance(v, str) for m in REF_TOKEN.finditer(v)}
 
 
 def resolve(args: dict, outputs: dict) -> dict:
-    out = {}
-    for k, v in args.items():
-        if isinstance(v, str):
-            whole = REF.fullmatch(v)
-            out[k] = outputs[whole.group(1)] if whole else REF.sub(lambda m: str(outputs[m.group(1)]), v)
-        else:
-            out[k] = v
-    return out
+    def one(value):
+        if not isinstance(value, str):
+            return value
+        whole = REF_TOKEN.fullmatch(value)
+        if whole:
+            step_id, field, bracket_field = whole.groups()
+            result = outputs[step_id]
+            key = field or bracket_field
+            if key is None:
+                return result
+            if isinstance(result, dict) and key in result:
+                return result[key]
+            raise KeyError(f"reference {value} field not found")
+        return REF_TOKEN.sub(lambda m: str(one(m.group(0))), value)
+    return {k: one(v) for k, v in args.items()}
 
 
 def validate(plan: Plan, registry: dict) -> list[str]:

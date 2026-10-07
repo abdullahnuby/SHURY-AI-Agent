@@ -35,6 +35,30 @@ def make_goal(frame: Any) -> GoalSpec:
     elif op in {'research', 'learning_intent', 'open_world_learning'}:
         name = 'ground_research_question' if op == 'research' else 'self_improvement_research'
         desired = ('answer_grounded',) if op == 'research' else ('research_evidence', 'learning_candidate')
+    elif op == 'project_audit':
+        name = 'audit_project'
+        desired = ('project_audit_report_created', 'project_tests_observed', 'project_inspected', 'git_status_observed')
+    elif op == 'workspace_inventory':
+        name = 'inventory_workspace'
+        desired = ('workspace_snapshot_observed', 'workspace_inventory_created', 'workspace_inventory_verified')
+    elif op == 'workspace_recursive_inventory':
+        name = 'inventory_workspace_tree'
+        desired = ('workspace_recursive_snapshot_observed', 'workspace_tree_inventory_created', 'workspace_tree_inventory_verified')
+    elif op == 'workspace_file_organization':
+        name = 'organize_workspace_files'
+        desired = ('workspace_snapshot_observed', 'workspace_files_organized', 'workspace_organization_verified')
+    elif op == 'workspace_duplicate_cleanup':
+        name = 'deduplicate_workspace_files'
+        desired = ('workspace_duplicates_detected', 'workspace_duplicates_archived', 'workspace_duplicate_cleanup_verified')
+    elif op == 'cross_department_data_move':
+        name = 'cross_department_data_move'
+        desired = ('csv_collection_analyzed', 'workspace_file_moved', 'company_data_report_created', 'company_data_report_verified')
+    elif op == 'cross_department_sales_report_move':
+        name = 'cross_department_sales_report_move'
+        desired = ('csv_average_ranked', 'sales_analysis_report_created', 'report_moved', 'sales_analysis_report_verified', 'report_move_verified')
+    elif op == 'research_report':
+        name = 'research_and_compare'
+        desired = ('research_report_created', 'research_report_verified')
     elif op == 'skill_query':
         name = 'inspect_skills'
         desired = ('skills_observed', 'skill_candidates_observed')
@@ -49,6 +73,7 @@ def make_goal(frame: Any) -> GoalSpec:
         success_conditions=desired,
         query=q,
         required_evidence=('memory',) if name in {'query_identity', 'query_memory'} else (),
+        required_capability=op,
     )
 
 
@@ -349,6 +374,33 @@ def _try_exploration_plan(
         return []
 
 
+def _goal_requires_local_coverage(frame: Any) -> dict[str, bool]:
+    import re
+    text = str(getattr(frame, 'text', '') or '').casefold()
+    return {
+        'move': bool(re.search(r"(?:انقل|حرك|حرّك|نقل|move|transfer|put)\b", text, re.I)),
+        'destination': bool(getattr(frame, 'slot', lambda *_: None)('destination_dir')),
+    }
+
+
+def _skill_covers_goal(skill_steps: list[PlannedAction], frame: Any, registry: dict[str, Any] | None) -> bool:
+    need = _goal_requires_local_coverage(frame)
+    tools = {step.tool.casefold() for step in skill_steps}
+    if need['move'] and not any('move' in tool for tool in tools):
+        return False
+    if need['destination']:
+        expected = str(getattr(frame, 'slot', lambda *_: '')('destination_dir') or '').replace('\\', '/').strip('/').casefold()
+        for step in skill_steps:
+            params = getattr(registry.get(step.tool), 'params', {}) if registry else {}
+            if 'destination_dir' in params and str(step.args.get('destination_dir') or '').replace('\\', '/').strip('/').casefold() == expected:
+                return True
+            output_path = str(step.args.get('output_path') or '').replace('\\', '/').strip('/').casefold()
+            if 'output_path' in params and output_path and expected and output_path.startswith(expected + '/'):
+                return True
+        return False
+    return True
+
+
 def plan(goal: GoalSpec, frame: Any, candidates: list[CandidateAction], *,
          state: CognitiveState | None = None, experiences: Any | None = None,
          avoid_tools: set[str] | None = None, learning: Any | None = None,
@@ -357,7 +409,7 @@ def plan(goal: GoalSpec, frame: Any, candidates: list[CandidateAction], *,
     if frame is None:
         return []
     avoid = set(avoid_tools or ())
-    mandatory_uncertainties = {'learning_topic_required', 'capability_not_identified'}
+    mandatory_uncertainties = {'learning_topic_required', 'capability_not_identified', 'workspace_reference_ambiguous', 'destination_ambiguous', 'workspace_reference_outside_boundary', 'workspace_destination_outside_boundary'}
     if mandatory_uncertainties.intersection(set(getattr(frame, 'uncertainty', ()) or ())):
         return []
 
@@ -378,10 +430,39 @@ def plan(goal: GoalSpec, frame: Any, candidates: list[CandidateAction], *,
                     break
                 tool_obj = registry.get(tool_name) if registry else None
                 cap = str(item.get('capability', '') or (getattr(tool_obj, 'capability', None) if tool_obj else None) or tool_name)
-                step_args = dict(item.get('args', {}) or item.get('parameters', {}) or {})
-                if frame:
-                    for k, v in getattr(frame, 'slots', ()) or ():
-                        step_args.setdefault(k, v)
+                step_args = {}
+                if str(item.get('args_policy', '')).casefold() == 'derive-from-live-goal' and tool_obj is not None:
+                    try:
+                        step_args.update(tool_obj.args_for(frame.text))
+                    except Exception:
+                        # The frame still gets a chance to provide structured slots.
+                        pass
+                step_args.update(dict(item.get('args', {}) or item.get('parameters', {}) or {}))
+                if frame and tool_obj is not None:
+                    # Only pass semantic slots that belong to the tool contract.
+                    # Namespaced slots such as ``operation:expression`` are projected
+                    # onto a matching tool parameter (``expression``) rather than
+                    # leaking the semantic namespace into Tool.validate_args().
+                    params = set(getattr(tool_obj, 'params', {}) or {})
+                    for key, value in getattr(frame, 'slots', ()) or ():
+                        key_text = str(key)
+                        if key_text in params:
+                            step_args.setdefault(key_text, value)
+                            continue
+                        if ':' in key_text:
+                            local_key = key_text.split(':', 1)[1]
+                            if local_key in params:
+                                step_args.setdefault(local_key, value)
+                # Preserve a user-specified destination even when the Skill contract exposes
+                # only an output_path argument (for example, report creation). The report
+                # remains a single workspace-relative artifact at the requested destination.
+                if frame is not None and tool_obj is not None:
+                    destination = str(getattr(frame, 'slot', lambda *_: '')('destination_dir') or '').strip()
+                    output_path = str(step_args.get('output_path') or '').strip()
+                    params = set(getattr(tool_obj, 'params', {}) or {})
+                    if destination and output_path and 'output_path' in params:
+                        from pathlib import Path
+                        step_args['output_path'] = str(Path(destination) / Path(output_path).name).replace('\\', '/')
                 skill_steps.append(PlannedAction(
                     step_id=str(item.get('step_id', '') or f's{index}'),
                     capability=cap,
@@ -395,7 +476,7 @@ def plan(goal: GoalSpec, frame: Any, candidates: list[CandidateAction], *,
             else:
                 valid_skill_plan = False
                 break
-        if valid_skill_plan and skill_steps and len(skill_steps) == len(workflow):
+        if valid_skill_plan and skill_steps and len(skill_steps) == len(workflow) and _skill_covers_goal(skill_steps, frame, registry):
             args_ok = True
             if registry:
                 for step in skill_steps:

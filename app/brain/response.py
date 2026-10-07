@@ -82,6 +82,8 @@ def compose(decision: Decision, state: CognitiveState) -> str:
         if decision.answer_source == 'self_model':
             return _self_model_answer(state, arabic=arabic)
         if decision.answer_source in {'beliefs', 'memory'}:
+            if decision.conclusion == 'memory_not_found':
+                return 'معنديش معلومة محفوظة عن ده.' if arabic else "I don't have a stored memory about that."
             return _evidence_answer(state, arabic=arabic)
         if decision.evidence:
             return _evidence_answer(state, arabic=arabic)
@@ -95,14 +97,39 @@ def compose(decision: Decision, state: CognitiveState) -> str:
         return 'هحوّل الهدف لخطة تنفيذ وأتحقق من النتيجة.' if arabic else 'I will execute the planned actions and verify the result.'
     if decision.kind == 'clarify':
         missing = '، '.join(x for x in decision.missing_information if x)
+        if decision.missing_information == ('workspace_reference',):
+            candidates = state.semantic.slot('workspace:ambiguity_candidates') if state.semantic else ''
+            if candidates:
+                return f'تقصد {candidates}؟'
+            return 'ممكن تحدد اسم الملف أو المجلد المقصود؟'
+        if 'goal_or_capability' in decision.missing_information or 'capability_not_identified' in decision.missing_information:
+            return 'ممكن تقولّي عايز تعمل إيه تحديدًا؟' if arabic else 'Tell me what you want me to do specifically.'
+        if 'anaphoric_reference_unresolved' in decision.missing_information or 'reference-unresolved' in decision.missing_information:
+            return 'ممكن تحدد المقصود بشكل مباشر؟ اكتب اسم الملف أو المجلد أو الهدف المطلوب.' if arabic else 'Please specify the target directly: give the file/folder name or the requested goal.'
+        if 'workspace_reference' in decision.missing_information:
+            candidates = ''
+            if state.semantic:
+                candidates = (state.semantic.slot('workspace:ambiguity_candidates')
+                              or state.semantic.slot('workspace:destination_candidates'))
+            if candidates:
+                return f'تقصد {candidates}؟'
+            return 'ممكن تحدد اسم الملف أو المجلد المقصود؟'
         if 'learning_topic' in decision.missing_information:
             return (
                 'عايزني أتعلم إيه تحديدًا؟ مثال: أحدث أبحاث RAG والوكلاء الذكية.'
                 if arabic else
                 'What should I learn specifically? For example: the latest research on RAG and intelligent agents.'
             )
-        return (f'محتاج تحديد: {missing}' if missing else 'محتاج معلومة إضافية تحدد الهدف.') if arabic else (f'I need: {missing}' if missing else 'I need one more detail to determine the goal.')
+        # Internal slot/reason identifiers must never become user-facing text. Unknown
+        # clarification reasons therefore fall back to a useful human question rather
+        # than exposing implementation vocabulary.
+        return ('ممكن تحدد المعلومة الناقصة أو المقصود بالضبط عشان أنفذ الطلب؟' if arabic
+                else 'Please specify the missing detail or intended target so I can execute the request.')
     if decision.kind == 'refuse':
+        if state.semantic and any(x in {'workspace_reference_outside_boundary', 'workspace_destination_outside_boundary'} for x in state.semantic.uncertainty):
+            # Boundary refusals are safety-critical user guidance; keep them explicit and
+            # Arabic even when the request itself is English so the reason cannot be obscured.
+            return 'المسار خارج الـworkspace المسموح به، ومش هعمل أي استدعاء للأداة.'
         return 'مش هقدر أنفذ العملية دي ضمن الحدود الحالية.' if arabic else 'I cannot execute that within my current boundaries.'
     return 'مش هخمن في حاجة معنديش عليها دليل.' if arabic else "I won't guess without evidence."
 
@@ -124,6 +151,11 @@ def compose_action_result(state: CognitiveState, *, action: Any, output: Any, al
     if operation == 'query_time':
         return (f'الوقت الحالي هو {clean}.' if arabic else f'The current time is {clean}.') if clean else ('ملقتش وقت صالح في النتيجة.' if arabic else 'No valid time was returned.')
     if operation == 'calculate':
+        expression = ''
+        if state.semantic:
+            expression = str(state.semantic.slot('expression') or state.semantic.slot('operation:expression') or '').strip()
+        if clean and expression:
+            return (f'النتيجة = {expression} = {clean}.' if arabic else f'The result is {expression} = {clean}.')
         return (f'النتيجة = {clean}.' if arabic else f'The result is {clean}.') if clean else ('الحساب لم يُرجع نتيجة.' if arabic else 'The calculation returned no result.')
     if operation == 'remember':
         predicate = state.semantic.slot('predicate') if state.semantic else ''
@@ -140,6 +172,111 @@ def compose_action_result(state: CognitiveState, *, action: Any, output: Any, al
         key = state.semantic.slot('result_key') if state.semantic else 'total'
         value_text = str(value) if value is not None else ''
         return (f'حسبتها = {value_text}، وحفظتها باسم {key}.' if arabic else f'I calculated {value_text} and saved it as {key}.')
+    if operation == 'file_read' and isinstance(output, dict):
+        path = str(output.get('path') or '').strip()
+        line_count = output.get('line_count')
+        if line_count is not None:
+            return (f'قرأت {path or "الملف"}، وعدد سطوره {line_count}.' if arabic
+                    else f'Read {path or "the file"}; it contains {line_count} lines.')
+        content = str(output.get('content') or '').strip()
+        return (f'قرأت {path or "الملف"}.\n{content}' if arabic
+                else f'Read {path or "the file"}.\n{content}')
+
+    if operation == 'data_analysis' and isinstance(output, dict):
+        answer = output.get('answer') if isinstance(output.get('answer'), dict) else {}
+        if answer:
+            column = answer.get('column') or answer.get('selected_column') or answer.get('value')
+            if 'value' in answer and answer.get('value') is not None:
+                op = str(answer.get('operation') or '').casefold()
+                label = {'sum': 'الإجمالي', 'mean': 'المتوسط', 'median': 'الوسيط', 'max': 'أعلى قيمة', 'min': 'أقل قيمة'}.get(op, op or 'القيمة')
+                return (f'{label} في {column} = {answer.get("value")}.' if arabic else f'{label} for {column} = {answer.get("value")}.')
+            if 'rows' in answer and set(answer).issuperset({'rows'}):
+                return (f'عدد الصفوف = {answer.get("rows")}.' if arabic else f'Row count = {answer.get("rows")}.')
+            if 'quality_score' in answer:
+                return (f'درجة جودة البيانات {answer.get("quality_score")}%، وعدد الصفوف المكررة {answer.get("duplicate_rows", 0)}.' if arabic
+                        else f'Data quality score is {answer.get("quality_score")}%, with {answer.get("duplicate_rows", 0)} duplicate rows.')
+            return _clean_internal(str(answer))
+
+    if operation == 'workspace_inventory' and isinstance(output, dict):
+        evidence = output if 'file_count' in output else next((x for x in reversed(all_outputs.values()) if isinstance(x, dict) and 'file_count' in x), output)
+        count = evidence.get('file_count')
+        return (f'في الجرد لقيت {count} ملفًا وتحققت من مطابقته للملفات المرصودة.' if arabic and count is not None
+                else 'أنشأت جردًا لملفات مساحة العمل وتحققت من مطابقته للملفات المرصودة.')
+
+    if operation == 'workspace_recursive_inventory' and isinstance(output, dict):
+        if arabic:
+            return f"أنشأت جردًا recursive لمساحة العمل، تحققت من إحصاءات المجلدات وأكبر 5 ملفات، وتم استبعاد التقرير نفسه من الإحصاءات. التقرير: {output.get('path', 'workspace_inventory.md')}"
+        return f"Created and verified a recursive workspace inventory, including folder statistics and the largest 5 files; the report itself was excluded. Report: {output.get('path', 'workspace_inventory.md')}"
+
+    if operation == 'workspace_duplicate_cleanup':
+        evidence = output if isinstance(output, dict) and ('moved_file_count' in output or 'duplicate_groups' in output) else None
+        if evidence is None:
+            for candidate in reversed(list(all_outputs.values())):
+                if isinstance(candidate, dict) and ('moved_file_count' in candidate or 'duplicate_groups' in candidate):
+                    evidence = candidate
+                    break
+        if evidence is not None:
+            moved = int(evidence.get('moved_file_count', 0))
+            groups = int(evidence.get('duplicate_group_count', len(evidence.get('duplicate_groups') or [])))
+            archive = str(evidence.get('archive') or 'duplicates_archive')
+            if arabic:
+                return f'اكتشفت {groups} مجموعات من الملفات المتطابقة حسب بصمة المحتوى، ونقلت {moved} نسخة زائدة إلى {archive} مع التحقق من سلامة المحتوى وعدم فقد أي ملف.'
+            return f'Detected {groups} duplicate-content groups and safely archived {moved} extra copies in {archive}, with content-integrity and no-loss verification.'
+
+    if operation == 'workspace_file_organization' and isinstance(output, dict):
+        path = str(output.get('path') or '').strip()
+        moved = output.get('moved_file_count')
+        categories = output.get('categories_created')
+        if arabic:
+            suffix = f' عدد الملفات المنقولة: {moved}.' if moved is not None else ''
+            cat = f' وتم إنشاء {categories} تصنيفات.' if categories is not None else ''
+            report = f' في {path}' if path else ''
+            return f'رتبت ملفات مساحة العمل حسب النوع وتحققت من سلامة النقل والتقرير{report}.{cat}{suffix}'
+        return f'Workspace files were organized by type and the move/report were verified at {path}. Moved: {moved}; categories: {categories}.'
+
+    if operation == 'project_audit' and isinstance(output, dict):
+        report = str(output.get('path') or '').strip()
+        summary = output.get('test_summary') if isinstance(output.get('test_summary'), dict) else {}
+        problems = output.get('top_problems') if isinstance(output.get('top_problems'), list) else []
+        if arabic:
+            lines = [f'تم فحص المشروع وإنشاء تقرير التدقيق والتحقق منه في {report or "workspace/shury_project_audit.md"}.']
+            lines.append(f"الاختبارات: {summary.get('passed', 0)} ناجح، {summary.get('failed', 0)} فشل من {summary.get('attempted', 0)}.")
+            lines.append(f"أهم المشاكل المرصودة: {len(problems)}.")
+            return '\n'.join(lines)
+        return f"Project audit completed and verified at {report or 'workspace/shury_project_audit.md'}. Tests: {summary.get('passed', 0)} passed, {summary.get('failed', 0)} failed out of {summary.get('attempted', 0)}. Top problems: {len(problems)}."
+    if operation == 'research_report' and isinstance(output, dict):
+        path = str(output.get('path') or '').strip()
+        count = output.get('paper_count')
+        if arabic:
+            return f'تم إجراء البحث وتجهيز تقرير الأبحاث والتحقق منه في {path}. عدد الأبحاث المستلمة: {count}.' if path else f'تم إجراء البحث وتجهيز تقرير الأبحاث والتحقق منه. عدد الأبحاث المستلمة: {count}.'
+        return f'Research report created and verified at {path}. Papers received: {count}.' if path else f'Research report created and verified. Papers received: {count}.'
+    if operation == 'data_analysis_report' and isinstance(output, dict):
+        path = str(output.get('path') or '').strip()
+        summary = output.get('summary') if isinstance(output.get('summary'), dict) else {}
+        rows = summary.get('rows')
+        columns = summary.get('columns')
+        duplicates = summary.get('duplicate_rows')
+        findings = output.get('findings') if isinstance(output.get('findings'), list) else []
+        finding_count = len(findings)
+        if arabic:
+            location = f' في {path}' if path else ''
+            details = []
+            if rows is not None and columns is not None:
+                details.append(f'{rows} صف و{columns} أعمدة')
+            if duplicates is not None:
+                details.append(f'{duplicates} صفوف مكررة')
+            details.append(f'{finding_count} ملاحظات تحليلية')
+            suffix = '، '.join(details)
+            return f'تم تحليل الملف وإنشاء التقرير والتحقق منه{location}. {suffix}.' if suffix else f'تم تحليل الملف وإنشاء التقرير والتحقق منه{location}.'
+        location = f' at {path}' if path else ''
+        details = []
+        if rows is not None and columns is not None:
+            details.append(f'{rows} rows and {columns} columns')
+        if duplicates is not None:
+            details.append(f'{duplicates} duplicate rows')
+        details.append(f'{finding_count} analytical findings')
+        suffix = ', '.join(details)
+        return f'Analysis report created and verified{location}. {suffix}.' if suffix else f'Analysis report created and verified{location}.'
     if operation in {'research', 'learning_intent'} and isinstance(output, dict) and ('evidence_count' in output or 'new_evidence_count' in output):
         query = str(
             output.get('query')

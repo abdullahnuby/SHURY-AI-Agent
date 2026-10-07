@@ -522,7 +522,7 @@ def answer_question(path: str | Path, question: str) -> dict:
     result: dict[str, Any] = {"source": str(p), "fingerprint": profile.fingerprint, "question": question, "evidence": []}
 
     # Explicit quality intent.
-    if any(k in q for k in ("جودة", "quality", "missing", "ناقص", "مفقود", "duplicate", "مكرر")):
+    if any(k in q for k in ("جودة", "quality", "missing", "ناقص", "مفقود", "duplicate", "مكرر", "تكرار", "التكرارات")):
         result["answer"] = {"quality_score": profile.quality_score, "duplicate_rows": profile.duplicate_rows,
                              "warnings": profile.warnings, "columns": [asdict(c) for c in profile.column_profiles]}
         result["method"] = "deterministic_quality_profile"
@@ -602,7 +602,7 @@ def answer_question(path: str | Path, question: str) -> dict:
         return result
 
     # Group aggregation: "متوسط value حسب group" / "average value by group".
-    if any(k in q for k in ("حسب", "by ", "group by")) and numeric and cat:
+    if (re.search(r"(?:^|\W)حسب(?:\W|$)", q, re.I) or re.search(r"\b(?:by|group\s+by)\b", q, re.I)) and numeric and cat:
         value_col = next((c.name for c in numeric if c.name.casefold() in q), numeric[0].name)
         group_col = next((c.name for c in cat if c.name.casefold() in q), cat[0].name)
         grouped = {}
@@ -620,7 +620,7 @@ def answer_question(path: str | Path, question: str) -> dict:
 
     # Aggregate intent: average/mean/median/min/max/sum/count.
     aggregate = None
-    for key, op in (("sum", "sum"), ("مجموع", "sum"), ("متوسط", "mean"), ("average", "mean"),
+    for key, op in (("sum", "sum"), ("اجمع", "sum"), ("مجموع", "sum"), ("إجمالي", "sum"), ("اجمالي", "sum"), ("الإجمالي", "sum"), ("متوسط", "mean"), ("average", "mean"),
                     ("mean", "mean"), ("median", "median"), ("وسيط", "median"),
                     ("minimum", "min"), ("min", "min"), ("اقل", "min"),
                     ("maximum", "max"), ("max", "max"), ("أعلى", "max"), ("count", "count"), ("عدد", "count")):

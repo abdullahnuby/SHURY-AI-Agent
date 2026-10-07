@@ -12,7 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from app.runtime.security import safe_workspace_path
+from app.runtime.security import safe_project_path
 
 IGNORED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "dist", "build", "target"}
 
@@ -31,7 +31,7 @@ def _run(argv: list[str], cwd: Path, timeout: float = 90.0) -> dict:
 
 
 def _resolve_project_path(path: str | Path) -> Path:
-    return safe_workspace_path(path)
+    return safe_project_path(path)
 
 def inspect_project(path: str | Path) -> dict:
     root = _resolve_project_path(path)
@@ -78,7 +78,7 @@ def inspect_project(path: str | Path) -> dict:
 
 
 def git_status(path: str | Path) -> dict:
-    root = safe_workspace_path(path)
+    root = safe_project_path(path)
     if not (root / ".git").exists():
         return {"path": str(root), "git": False}
     branch = _run(["git", "branch", "--show-current"], root, 10)

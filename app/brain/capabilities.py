@@ -4,6 +4,12 @@ from typing import Any
 
 from app.brain.models import Capability, CandidateAction
 from app.runtime.registry import Tool
+import re
+
+
+def _tokens(text: str) -> set[str]:
+    value = re.sub(r"\s+", " ", str(text).casefold()).strip()
+    return set(re.findall(r"[\w\u0600-\u06ff]+", value, flags=re.UNICODE))
 
 
 def build_capabilities(registry: dict[str, Tool]) -> list[Capability]:
@@ -46,6 +52,15 @@ def discover_candidates(frame: Any, registry: dict[str, Tool]) -> list[Candidate
         'file_read': {'read_file', 'read_file_part'},
         'development_validation': {'validate_project'},
         'data_analysis': {'profile_dataset', 'analyze_dataset'},
+        'data_analysis_report': {'create_data_analysis_report'},
+        'workspace_inventory': {'list_files', 'create_file_inventory', 'read_file'},
+        'workspace_recursive_inventory': {'list_files_recursive', 'create_workspace_tree_inventory', 'read_file'},
+        'workspace_file_organization': {'list_files', 'organize_workspace_files', 'move_workspace_report', 'read_file'},
+        'workspace_duplicate_cleanup': {'list_files_recursive', 'deduplicate_workspace_files', 'read_file'},
+        'cross_department_data_move': {'list_files_recursive', 'analyze_csv_collection', 'move_workspace_file', 'create_company_data_report', 'read_file'},
+        'cross_department_sales_report_move': {'list_files_recursive', 'analyze_csv_by_average', 'create_sales_analysis_report', 'move_workspace_report', 'read_file'},
+        'project_audit': {'create_project_audit_report', 'inspect_project', 'git_status', 'audit_project_tests'},
+        'research_report': {'internet_research', 'arxiv_research', 'create_research_report'},
     }
     desired = explicit.get(op, set())
     for name, tool in registry.items():
@@ -79,11 +94,7 @@ def discover_candidates(frame: Any, registry: dict[str, Tool]) -> list[Candidate
 
 
 def discover_skill_candidates(goal_spec: Any, frame: Any, skill_bank: Any) -> list[Any]:
-    """Discover and rank Skill candidates from SkillBank based on capability contracts.
-
-    Skill selection depends on capability requirements, preconditions, and outputs,
-    NOT on raw sentence-pattern matching.
-    """
+    """Discover executable Skills from capability requirements, not raw sentences."""
     if skill_bank is None:
         return []
     try:
@@ -91,45 +102,44 @@ def discover_skill_candidates(goal_spec: Any, frame: Any, skill_bank: Any) -> li
     except Exception:
         return []
 
-    req_cap = str(getattr(goal_spec, 'required_capability', '') or getattr(goal_spec, 'name', '') or '').casefold().strip()
+    req_cap = str(getattr(goal_spec, 'required_capability', '') or '').casefold().strip()
     op = str(getattr(frame, 'requested_operation', '') or '').casefold().strip()
-    
-    target_caps = set()
-    if req_cap:
-        target_caps.add(req_cap)
-    if op:
-        target_caps.add(op)
+    target_caps = {x for x in (req_cap, op) if x}
+    if not target_caps:
+        return []
 
-    matched = []
+    matched: list[tuple[float, float, Any]] = []
     for skill in skills:
         if getattr(skill, 'status', '') not in {'approved', 'active'}:
             continue
-        
-        skill_key = str(getattr(skill, 'key', '') or '').casefold().strip()
-        skill_name = str(getattr(skill, 'name', '') or '').casefold().strip()
-        triggers = tuple(str(x).casefold().strip() for x in (getattr(skill, 'triggers', ()) or ()))
-        outputs = tuple(str(x).casefold().strip() for x in (getattr(skill, 'outputs', ()) or ()))
-        
-        skill_caps = {skill_key, skill_name}
-        workflow = getattr(skill, 'workflow', ()) or ()
+        workflow = tuple(getattr(skill, 'workflow', ()) or ())
+        workflow_caps: set[str] = set()
+        workflow_tools: set[str] = set()
         for item in workflow:
-            if isinstance(item, dict):
-                cap = str(item.get('capability', '') or item.get('tool', '')).casefold().strip()
-                if cap:
-                    skill_caps.add(cap)
-        
-        skill_caps.update(triggers)
-        skill_caps.update(outputs)
-
-        # Require exact match on the target operation/capability or explicit trigger
-        if not (target_caps & {skill_key, skill_name}) and not (req_cap and req_cap in skill_caps and req_cap in triggers):
-            if not (op and op in skill_caps and (op == skill_key or op in triggers)):
+            if not isinstance(item, dict):
                 continue
+            for key in ('capability', 'tool'):
+                value = str(item.get(key, '') or '').casefold().strip()
+                if value:
+                    (workflow_caps if key == 'capability' else workflow_tools).add(value)
+        declared = {
+            str(getattr(skill, 'key', '') or '').casefold().strip(),
+            str(getattr(skill, 'name', '') or '').casefold().strip(),
+            *workflow_caps, *workflow_tools,
+        }
+        overlap = target_caps & declared
+        trigger_tokens = set().union(*(_tokens(x) for x in (getattr(skill, 'triggers', ()) or ())))
+        capability_tokens = _tokens(' '.join((*workflow_caps, *workflow_tools, *getattr(skill, 'outputs', ()))))
+        trigger_fit = max((len(_tokens(cap)) and len(_tokens(cap) & trigger_tokens) / len(_tokens(cap)) for cap in target_caps), default=0.0)
+        structural = 1.0 if overlap else 0.0
+        if not overlap:
+            # A trigger may support aliasing only when the target capability is explicit
+            # in the Skill contract as a workflow capability/tool. Never select solely
+            # because a user sentence contains a trigger phrase.
+            continue
+        score = float(getattr(skill, 'utility', 0.5)) + 0.55 * len(overlap) + 0.10 * trigger_fit
+        matched.append((score, structural, skill))
 
-        overlap = target_caps & skill_caps
-        score = float(getattr(skill, 'utility', 0.5)) + len(overlap) * 0.5
-        matched.append((score, skill))
-
-    matched.sort(key=lambda x: (-x[0], str(getattr(x[1], 'key', ''))))
-    return [item[1] for item in matched]
+    matched.sort(key=lambda x: (-x[0], -x[1], str(getattr(x[2], 'key', ''))))
+    return [item[2] for item in matched]
 

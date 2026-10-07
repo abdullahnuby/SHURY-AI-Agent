@@ -27,10 +27,40 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tests", nargs="+", help="pytest file/path values")
     parser.add_argument("--timeout", type=float, default=90.0, help="per-file timeout in seconds")
+    parser.add_argument("--skip-ruff", action="store_true", help="skip the mandatory F821 ruff gate")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
     env = dict(os.environ)
+
+    if not args.skip_ruff:
+        try:
+            ruff = subprocess.run(
+                ["ruff", "check", "--select", "F821", "app/"],
+                cwd=root, env=env, text=True, capture_output=True,
+            )
+        except FileNotFoundError:
+            ruff_payload = {
+                "gate": "ruff F821",
+                "command": "ruff check --select F821 app/",
+                "status": "tool_missing",
+                "exit_code": None,
+                "stdout": "",
+                "stderr": "ruff executable is not installed in the current environment",
+            }
+            print(json.dumps({"ruff": ruff_payload}, ensure_ascii=False, indent=2))
+            return 1
+        ruff_payload = {
+            "gate": "ruff F821",
+            "command": "ruff check --select F821 app/",
+            "status": "passed" if ruff.returncode == 0 else "failed",
+            "exit_code": ruff.returncode,
+            "stdout": ruff.stdout[-12000:],
+            "stderr": ruff.stderr[-4000:],
+        }
+        print(json.dumps({"ruff": ruff_payload}, ensure_ascii=False, indent=2))
+        if ruff.returncode != 0:
+            return 1
     env["PYTHONPATH"] = str(root) + os.pathsep + env.get("PYTHONPATH", "")
 
     results: list[dict[str, object]] = []

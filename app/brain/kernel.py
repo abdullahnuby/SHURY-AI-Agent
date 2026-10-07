@@ -5,6 +5,10 @@ import json
 import math
 import time
 import uuid
+import copy
+import threading
+import queue
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -14,7 +18,7 @@ from app.skills.registry import SkillBank
 from app.brain.deliberation import deliberate
 from app.brain.inference import infer, rank_beliefs
 from app.brain.self_model import SelfModel
-from app.brain.models import ActionSpec, Belief, CognitiveState, Evidence, GoalSpec, PlannedAction, SemanticFrame
+from app.brain.models import ActionSpec, Belief, CognitiveState, Decision, Evidence, GoalSpec, PlannedAction, SemanticFrame
 from app.brain.perception import perceive
 from app.brain.planner import make_goal, plan, replan
 from app.brain.response import compose, compose_action_result
@@ -27,9 +31,17 @@ from app.domain.plan import Plan, PlanStep
 from app.runtime.registry import Tool, load_tools
 from app.runtime.policy import check_tool
 from app.runtime.verify import verify_step
+from app.skills.verification import verify_skill_contract
 from app.brain.structured import validate_structured_goal
 from app.intelligence.semantic import semantic_understand
+from app.organization import DEFAULT_COMPANY
 from app.runtime.memory_context import push_memory, pop_memory
+from app.organization import review_company_execution, CompanyMemory, CompanyGovernance, GovernanceContext
+from app.organization.evidence import CompanyEvidencePolicy
+from app.organization.scheduler import CompanyScheduler
+from app.organization.context import (
+    CompanyContextViolation, assert_references_allowed, company_context,
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +79,9 @@ class CognitiveKernel:
         self.learning = learning_manager or SelfImprovementManager(store=learning_store)
         self.experiences = self.learning.store
         self.self_model = SelfModel(self.registry, self.experiences)
+        self.company = DEFAULT_COMPANY
+        self.company_memory = CompanyMemory(self.memory)
+        self.company_evidence = CompanyEvidencePolicy()
 
     def _load_beliefs(self, session_id: str) -> list[Belief]:
         """Return a Brain-safe projection supplied by the canonical Memory Controller."""
@@ -98,7 +113,7 @@ class CognitiveKernel:
         """
         try:
             key = self.memory.canonical_key(predicate)
-            value = self.memory.get_fact(key)
+            value = self.memory.get_fact(key, session_id=session_id)
         except Exception:
             value = None
             key = str(predicate or '')
@@ -202,9 +217,21 @@ class CognitiveKernel:
             if parsed_slots.get('fact:preference') is not None:
                 parsed_slots.setdefault('predicate', 'preference')
                 parsed_slots.setdefault('value', parsed_slots['fact:preference'])
+            # Generic explicit facts use their natural user-supplied key as predicate.
+            # Project this arbitrary fact slot into the canonical remember tool contract so
+            # memory phrases such as "خزّن كود الفرع: EGY-7" do not become planner ambiguity.
+            if not parsed_slots.get('predicate') or not parsed_slots.get('value'):
+                generic_facts = [(str(k)[5:], str(v)) for k, v in parsed_slots.items() if str(k).startswith('fact:') and str(k)[5:]]
+                if generic_facts:
+                    predicate, value = generic_facts[0]
+                    parsed_slots.setdefault('predicate', predicate)
+                    parsed_slots.setdefault('value', value)
 
             top_intent = parsed.intent_candidates[0].name if parsed.intent_candidates else ''
             operation = str(top_intent or fallback_frame.requested_operation or '').strip()
+            if getattr(parsed, 'needs_clarification', False):
+                fallback_operation = str(fallback_frame.requested_operation or '').strip()
+                operation = fallback_operation if fallback_operation not in {'', 'statement'} else 'unknown_task'
             if operation == 'recall_fact':
                 operation = 'query_identity' if parsed_slots.get('key', '') == 'name' else 'query_memory'
             elif operation in {'memory_search', 'memory_profile', 'memory_stats'}:
@@ -248,7 +275,14 @@ class CognitiveKernel:
                     conditions=tuple(f'{c.key}:{c.operator}:{c.value}' for c in parsed.constraints),
                     uncertainty=tuple(dict.fromkeys(
                         [str(x) for x in (parsed.required_information or ())] +
-                        [str(x) for x in (parsed.ambiguity_reasons or ())]
+                        [str(x) for x in (parsed.ambiguity_reasons or ())] +
+                        [
+                            str(x) for x in (parsed.safety_signals or ())
+                            if str(x) in {
+                                'workspace_reference_outside_boundary',
+                                'workspace_destination_outside_boundary',
+                            }
+                        ]
                     )),
                     memory_need=getattr(parsed, 'memory_need', 'none'),
                     memory_types=tuple(getattr(parsed, 'memory_types', ()) or ()),
@@ -256,7 +290,7 @@ class CognitiveKernel:
                 )
                 # Declarative user facts are not ambiguous goals. The semantic parser has
                 # already grounded them into a concrete memory operation + predicate/value.
-                if operation == 'remember' and frame.slot('predicate') and frame.slot('value'):
+                if operation == 'remember' and frame.slot('predicate') and frame.slot('value') and not getattr(parsed, 'needs_clarification', False):
                     frame = SemanticFrame(
                         text=frame.text, language=frame.language, speech_act='statement',
                         concepts=tuple(sorted(set(frame.concepts) | {'memory'})),
@@ -345,12 +379,39 @@ class CognitiveKernel:
         state.action_specs = [ActionSpec.from_candidate(candidate) for candidate in state.candidates]
         state.hypotheses = infer(state)
         state.goal = goal_override or (make_goal(state.semantic) if state.semantic else GoalSpec('open_task', state.user_text))
-        state.event('goal_formed', objective=state.goal.objective, name=state.goal.name, query=state.goal.query)
+        state.company_project_id = str(getattr(state.goal, 'project_id', '') or '')
+        state.company_project_context = {}
+        state.company_portfolio = {}
+        if state.company_project_id:
+            try:
+                project = self.company.portfolio.get_project(state.company_project_id)
+                if project is None:
+                    raise ValueError(f'unknown company project: {state.company_project_id}')
+                state.company_project_context = project.to_dict()
+                state.company_portfolio = self.company.portfolio.snapshot()
+                state.event('company_project_bound', project=state.company_project_context)
+            except Exception as exc:
+                state.event('company_project_binding_failed', project_id=state.company_project_id, error=f'{type(exc).__name__}: {exc}')
+                raise
+        else:
+            state.company_portfolio = self.company.portfolio.snapshot()
+        state.event('goal_formed', objective=state.goal.objective, name=state.goal.name, query=state.goal.query,
+                    project_id=state.company_project_id, horizon=getattr(state.goal, 'horizon', 'medium'))
         self.state_store.append_event(state.session_id or '', 'goal_formed', {
             'topic': state.goal.name, 'objective': state.goal.objective, 'query': state.goal.query,
             'source': 'structured_goal' if goal_override else 'natural_language',
         })
         state.beliefs = self._load_beliefs(state.session_id or '')
+
+        # C10: retrieve only durable, verified organizational memory. This lane is separate
+        # from user/session/run memory and is injected as evidence, never as task state.
+        try:
+            company_hits = self.company_memory.recall_for_goal(state.goal.objective if state.goal else state.user_text, top_k=6, project_id=state.company_project_id or None)
+            state.company_memory = [hit.to_dict() for hit in company_hits]
+            state.event('company_memory_retrieved', count=len(company_hits), hits=state.company_memory)
+        except Exception as exc:
+            state.company_memory = []
+            state.event('company_memory_retrieval_error', error=f'{type(exc).__name__}: {exc}')
         
         # Micro-Phase 2: Skill Selection as a First-Class Brain Decision
         # Skill matching depends on capability requirements and Skill contracts from SkillBank.
@@ -359,6 +420,8 @@ class CognitiveKernel:
         if state.selected_skill:
             state.event('skill_selected', key=getattr(state.selected_skill, 'key', ''), name=getattr(state.selected_skill, 'name', ''))
 
+        selected_skill_key = str(getattr(state.selected_skill, 'key', '') or '')
+
         if state.semantic and state.semantic.requested_operation in {'query_identity', 'query_memory'} and not state.evidence:
             query = state.semantic.slot('query') or state.goal.query or 'name'
             state.evidence = rank_beliefs([b.to_dict() for b in state.beliefs], query, limit=8)
@@ -366,8 +429,89 @@ class CognitiveKernel:
             state.goal, state.semantic, state.candidates,
             state=state, experiences=self.experiences,
             learning=self.learning, registry=self.registry,
+            # Structured GoalSpec requests already carry an explicit operation/capability.
+            # Do not let exploratory learning replace that typed workflow before execution.
+            allow_exploration=goal_override is None,
         ) if state.semantic else []
+
+        # A selected Skill is only authoritative when the materialized plan actually carries
+        # that Skill's contract. A failed Skill expansion must not leave a stale Skill attached
+        # to a different deterministic plan and invalidate an otherwise verified execution.
+        if state.selected_skill is not None:
+            selected_key = str(getattr(state.selected_skill, 'key', '') or '')
+            bound_keys = {str(getattr(step, 'skill_key', '') or '') for step in state.plan}
+            if selected_key and selected_key not in bound_keys:
+                state.event('skill_selection_unbound', selected_skill=selected_key, plan_skill_keys=sorted(x for x in bound_keys if x))
+                state.selected_skill = None
+                state.selected_skills = []
+
+        # Company Phase 5: the CEO first synthesizes the required capabilities from the
+        # structured semantic/task state. This is intentionally separate from routing so a
+        # novel capability can be resolved without introducing a workflow-name mapping.
+        capability_plan = None
+        task_ir = None
+        if state.semantic:
+            try:
+                from app.intelligence.task_compiler import compile_task_ir
+                task_ir = compile_task_ir(state.semantic)
+            except Exception as exc:
+                state.event('company_capability_synthesis_error', error=f'{type(exc).__name__}: {exc}')
+            capability_plan = self.company.registry.synthesize_capabilities(
+                semantic=state.semantic, task_ir=task_ir, plan=state.plan, tool_registry=self.registry
+            )
+            state.company_capability_plan = capability_plan.to_dict()
+            state.event('company_capability_synthesis', **state.company_capability_plan)
+
+            # Bounded novelty bridge: only synthesize a new executable plan when the normal
+            # planner produced none, TaskIR is executable, and every required capability has
+            # an exact declared tool owner. No fuzzy sentence-to-tool execution is allowed.
+            if not state.plan and task_ir is not None and bool(getattr(task_ir, 'executable', False)):
+                try:
+                    synthesized_plan, synthesized_capabilities = self.company.registry.synthesize_executable_plan(
+                        semantic=state.semantic, task_ir=task_ir, tool_registry=self.registry
+                    )
+                    if synthesized_plan:
+                        state.plan = synthesized_plan
+                        state.company_capability_plan = synthesized_capabilities.to_dict()
+                        state.event('company_capability_plan_synthesized',
+                                    plan=[x.to_dict() for x in state.plan],
+                                    capability_plan=state.company_capability_plan)
+                except Exception as exc:
+                    state.event('company_capability_plan_synthesis_error', error=f'{type(exc).__name__}: {exc}')
+
         state.event('planning', plan=[x.to_dict() for x in state.plan])
+        assignments = self.company.route_plan(
+            state.goal.objective if state.goal else state.user_text, state.plan, tool_registry=self.registry,
+            project_id=str(getattr(state, 'company_project_id', '') or ''),
+            horizon=str(getattr(state.goal, 'horizon', 'medium') if state.goal else 'medium'),
+        )
+        state.company_assignments = [{**a.to_dict(), 'mandate': self.company.mandate(a, str(getattr(state.plan[i], 'skill_key', '') or '')).to_dict() if str(getattr(state.plan[i], 'skill_key', '') or '') else {}} for i, a in enumerate(assignments)]
+        state.company_coordination = self.company.coordinate(
+            state.goal.objective if state.goal else state.user_text, assignments, tool_registry=self.registry
+        ).to_dict()
+        if state.company_project_id:
+            try:
+                synced = self.company.portfolio.sync_coordination(state.company_project_id, state.company_coordination)
+                state.event('company_project_tasks_synced', project_id=state.company_project_id, task_count=len(synced))
+                state.company_portfolio = self.company.portfolio.snapshot()
+            except Exception as exc:
+                state.event('company_project_task_sync_error', project_id=state.company_project_id, error=f'{type(exc).__name__}: {exc}')
+                raise
+        state.event('company_executive_decomposition',
+                    workstreams=state.company_coordination.get('workstreams', []),
+                    execution_waves=state.company_coordination.get('execution_waves', []),
+                    handoffs=state.company_coordination.get('handoffs', []),
+                    critical_path=state.company_coordination.get('critical_path', []),
+                    required_capabilities=state.company_coordination.get('required_capabilities', []),
+                    unresolved_capabilities=state.company_coordination.get('unresolved_capabilities', []),
+                    validation_errors=state.company_coordination.get('validation_errors', []),
+                    team_formation=state.company_coordination.get('team_formation', {}))
+        if state.company_assignments:
+            state.company_assignment = dict(state.company_assignments[0])
+            state.event('company_workflow_delegation', assignments=state.company_assignments)
+            state.event('company_coordination', coordination=state.company_coordination)
+            for item in state.company_assignments:
+                state.event('company_delegation', **item)
         canonical = state.to_canonical_state()
         state.event('canonical_state', fingerprint=canonical.fingerprint(),
                     pending_actions=list(canonical.pending_actions), completed_actions=list(canonical.completed_actions),
@@ -425,37 +569,296 @@ class CognitiveKernel:
         response = compose(state.decision, state)
         return BrainResult(state, response, status='decided', run_id=uuid.uuid4().hex)
 
-    def _resolve_action_args(self, action: PlannedAction, outputs: dict[str, Any]) -> dict[str, Any]:
+    def _resolve_action_args(self, action: PlannedAction, outputs: dict[str, Any], *,
+                             allowed_dependencies: set[str] | None = None) -> dict[str, Any]:
+        """Resolve only explicit dependency references; never expose unrelated prior outputs."""
+        allowed = set(allowed_dependencies if allowed_dependencies is not None else action.depends_on or ())
+
+        def resolve_reference(token: str) -> Any:
+            import re
+            match = re.fullmatch(r"\{\{(s\d+)(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[([A-Za-z_][A-Za-z0-9_]*)\])?\}\}", token)
+            if not match:
+                return None, False
+            step_id, field, bracket_field = match.groups()
+            if step_id not in allowed:
+                raise CompanyContextViolation(
+                    f"step {action.step_id} references undeclared dependency {step_id}"
+                )
+            if step_id not in outputs:
+                return None, False
+            value = outputs[step_id]
+            key = field or bracket_field
+            if key is None:
+                return value, True
+            if isinstance(value, dict) and key in value:
+                return value[key], True
+            return None, False
+
         def resolve(value: Any) -> Any:
             if isinstance(value, str):
-                for step_id, output in outputs.items():
-                    token = '{{' + step_id + '}}'
-                    if token in value:
-                        return value.replace(token, str(output))
+                exact, ok = resolve_reference(value)
+                if ok:
+                    return exact
+                import re
+                refs = tuple(m.group(1) for m in re.finditer(r"\{\{(s\d+)\}\}", value))
+                for step_id in refs:
+                    if step_id not in allowed:
+                        raise CompanyContextViolation(
+                            f"step {action.step_id} references undeclared dependency {step_id}"
+                        )
+                    if step_id in outputs:
+                        value = value.replace('{{' + step_id + '}}', str(outputs[step_id]))
                 return value
             if isinstance(value, dict):
                 return {k: resolve(v) for k, v in value.items()}
             if isinstance(value, list):
                 return [resolve(v) for v in value]
             return value
-        return resolve(action.args)
+
+        args = resolve(dict(action.args or {}))
+        tool = self.registry.get(action.tool)
+        pipe_param = getattr(tool, 'pipe_param', None) if tool is not None else None
+        if pipe_param and (pipe_param not in args or args.get(pipe_param) in (None, "")):
+            for dep in reversed(tuple(action.depends_on or ())):
+                if dep in allowed and dep in outputs:
+                    args[pipe_param] = outputs[dep]
+                    break
+        return args
+
+    @staticmethod
+    def _goal_action_requirements(goal: str) -> dict[str, bool]:
+        import re
+        text = str(goal or '').casefold()
+        return {
+            'move': bool(re.search(r"(?:انقل|حرك|حرّك|نقل|move|transfer|put)\b", text, re.I)),
+            'copy': bool(re.search(r"(?:انسخ|نسخ|copy)\b", text, re.I)),
+            'report': bool(re.search(r"(?:تقرير|report)\b", text, re.I)),
+        }
+
+    def _validate_action_coverage(self, state: CognitiveState, action: PlannedAction, args: dict[str, Any]) -> tuple[bool, str]:
+        requirements = self._goal_action_requirements(state.user_text)
+        tool = self.registry.get(action.tool)
+        if tool is None:
+            return False, 'الأداة المطلوبة غير متاحة.'
+        if requirements['move']:
+            if 'move' not in action.tool.casefold() and 'move' not in str(action.capability).casefold():
+                return False, 'الأداة المختارة لا تغطي فعل نقل الملف المطلوب.'
+            if not str(args.get('source_path') or args.get('analysis_result') or '').strip():
+                return False, 'مسار الملف المصدر غير محدد.'
+            if not str(args.get('destination_dir') or '').strip():
+                return False, 'مجلد الوجهة غير محدد.'
+        destination = ''
+        if state.semantic is not None:
+            destination = str(state.semantic.slot('destination_dir') or '').strip()
+        if destination and 'destination_dir' in (tool.params or {}):
+            actual = str(args.get('destination_dir') or '').strip().replace('\\', '/')
+            expected = destination.replace('\\', '/')
+            if actual.casefold() != expected.casefold():
+                return False, 'الوجهة في الخطة لا تطابق الوجهة التي حددها المستخدم.'
+        return True, ''
+
+    @staticmethod
+    def _filesystem_goal_postcondition(state: CognitiveState, action: PlannedAction, output: Any) -> tuple[bool, str]:
+        import re
+        from pathlib import Path
+        from app.runtime.security import safe_workspace_path
+        goal = str(state.user_text or '').casefold()
+        requirements = CognitiveKernel._goal_action_requirements(goal)
+        if requirements['move']:
+            if not isinstance(output, dict):
+                return False, 'نتيجة النقل غير منظمة بما يكفي للتحقق منها.'
+            if any(key in output and int(output.get(key) or 0) == 0 for key in ('moved_file_count', 'results_count')):
+                return False, 'لم يتم نقل أي ملف رغم أن الهدف طلب نقل ملف.'
+            source = str(output.get('source') or '').strip()
+            destination = str(output.get('destination') or '').strip()
+            if not source or not destination:
+                return False, 'نتيجة النقل لا تحتوي المصدر والوجهة للتحقق.'
+            try:
+                source_path = safe_workspace_path(source)
+                destination_path = safe_workspace_path(destination)
+            except Exception:
+                return False, 'تعذر التحقق من مسارات النقل داخل workspace.'
+            if source_path.exists() or not destination_path.is_file():
+                return False, 'التحقق النهائي للنقل فشل: المصدر أو الوجهة لا يطابقان الحالة المطلوبة.'
+            if output.get('source_removed') is False:
+                return False, 'ملف المصدر ما زال موجودًا بعد النقل.'
+            return True, ''
+
+        if not isinstance(output, dict):
+            return True, ''
+        operation = str(getattr(state.semantic, 'requested_operation', '') or '') if state.semantic else ''
+        if requirements['report']:
+            path_value = str(output.get('path') or '').strip()
+            if not path_value:
+                return False, 'نتيجة التقرير لا تحتوي مسار الملف الناتج.'
+            try:
+                report_path = safe_workspace_path(path_value)
+            except Exception:
+                return False, 'مسار التقرير خرج عن حدود workspace.'
+            if not report_path.is_file() or report_path.stat().st_size == 0:
+                return False, 'ملف التقرير غير موجود أو فارغ.'
+            if output.get('verified') is False or (isinstance(output.get('goal_verification'), dict) and output['goal_verification'].get('ok') is False):
+                return False, 'محتوى التقرير لم يمرّ بوابة التحقق الخاصة بالهدف.'
+        return True, ''
+    @staticmethod
+    def _bounded_tool_run(tool: Tool, args: dict[str, Any], timeout_seconds: float | None):
+        if timeout_seconds is None or timeout_seconds <= 0:
+            return tool.run(**args)
+        result_queue: queue.Queue[Any] = queue.Queue(maxsize=1)
+        def worker() -> None:
+            try:
+                result_queue.put(tool.run(**args), timeout=0.1)
+            except Exception as exc:
+                result_queue.put(type('TimedResult', (), {'ok': False, 'data': None, 'error': f'{type(exc).__name__}: {exc}'})())
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        try:
+            return result_queue.get(timeout=max(0.001, float(timeout_seconds)))
+        except queue.Empty:
+            return type('TimedResult', (), {'ok': False, 'data': None, 'error': 'execution timeout'})()
+
+    @staticmethod
+    def _bounded_call(fn: Callable[[], Any], timeout_seconds: float | None) -> tuple[bool, Any, str | None]:
+        """Run a potentially blocking cognitive stage without allowing the caller to wait past its budget."""
+        if timeout_seconds is None:
+            try:
+                return True, fn(), None
+            except Exception as exc:
+                return False, None, f'{type(exc).__name__}: {exc}'
+        if timeout_seconds <= 0:
+            return False, None, 'execution timeout'
+        result_queue: queue.Queue[Any] = queue.Queue(maxsize=1)
+
+        def worker() -> None:
+            try:
+                result_queue.put((True, fn(), None), timeout=0.1)
+            except Exception as exc:
+                try:
+                    result_queue.put((False, None, f'{type(exc).__name__}: {exc}'), timeout=0.1)
+                except queue.Full:
+                    pass
+
+        thread = threading.Thread(target=worker, daemon=True, name='shury-bounded-call')
+        thread.start()
+        try:
+            return result_queue.get(timeout=max(0.001, float(timeout_seconds)))
+        except queue.Empty:
+            return False, None, 'execution timeout'
 
     def _run_action(self, state: CognitiveState, action: PlannedAction, outputs: dict[str, Any],
-                    approve: Callable[[str, dict[str, Any]], bool]) -> tuple[bool, Any, str | None, bool, float]:
+                    approve: Callable[[str, dict[str, Any]], bool], deadline: float | None = None) -> tuple[bool, Any, str | None, bool, float]:
         tool = self.registry.get(action.tool)
         if tool is None:
             return False, None, f'الأداة {action.tool} غير مسجلة.', False, 0.0
-        args = self._resolve_action_args(action, outputs)
+        # Company authorization is a runtime gate, not documentation. The CEO-issued
+        # assignment must exist for this step, and the current structured ownership
+        # proof must still resolve to the same department before the tool executes.
+        assignment = next((
+            item for item in (getattr(state, 'company_assignments', []) or ())
+            if str(item.get('step_id', '')) == str(action.step_id)
+        ), None)
+        if assignment is None:
+            state.event('company_authorization_failed', step=action.step_id, tool=action.tool, reason='missing_assignment')
+            return False, None, 'الخطوة لا تملك تفويضًا من شركة SHURY.', False, 0.0
+        try:
+            expected = self.company.route_plan(
+                state.goal.objective if state.goal else state.user_text, [action], tool_registry=self.registry
+            )[0]
+            if str(expected.department) != str(assignment.get('department')):
+                state.event('company_authorization_failed', step=action.step_id, tool=action.tool,
+                            reason='department_ownership_changed',
+                            assigned_department=assignment.get('department'), expected_department=expected.department)
+                return False, None, 'تغير مالك الخطوة تنظيميًا، لذلك أوقفت الشركة التنفيذ حتى يعاد التفويض.', False, 0.0
+            if action.skill_key:
+                mandate = self.company.mandate(expected, str(action.skill_key))
+                if not mandate.authorize(str(action.skill_key), str(assignment.get('department'))):
+                    state.event('company_authorization_failed', step=action.step_id, tool=action.tool, reason='mandate_rejected')
+                    return False, None, 'تفويض الشركة لا يسمح بتنفيذ هذه المهارة داخل القسم الحالي.', False, 0.0
+            state.event('company_authorization_check', step=action.step_id, tool=action.tool,
+                        department=assignment.get('department'), specialist=assignment.get('specialist'), allowed=True)
+        except Exception as exc:
+            state.event('company_authorization_failed', step=action.step_id, tool=action.tool, reason=f'{type(exc).__name__}: {exc}')
+            return False, None, f'تعذر إثبات تفويض الشركة للخطوة: {exc}', False, 0.0
+        coordination = getattr(state, 'company_coordination', {}) or {}
+        objective = state.goal.objective if state.goal else state.user_text
+        context = self.company.registry.build_execution_context(
+            assignment=assignment, objective=objective, coordination=coordination,
+            arg_keys=(action.args or {}).keys(), evidence_refs=(), artifact_refs=(),
+            tool_registry=self.registry,
+        )
+        try:
+            if not context.authorize_tool(action.tool):
+                raise CompanyContextViolation(f'tool {action.tool} is outside the {context.department} context')
+            if not context.authorize_capability(str(action.capability or '')):
+                raise CompanyContextViolation(f'capability {action.capability} is outside the task context')
+            assert_references_allowed(action.args, context)
+        except CompanyContextViolation as exc:
+            state.company_active_context = context.to_dict()
+            state.company_execution_contexts[context.task_id] = context.to_dict()
+            state.event('company_context_violation', step=action.step_id, department=context.department,
+                        specialist=context.specialist, reason=str(exc))
+            return False, None, str(exc), False, 0.0
+        state.company_active_context = context.to_dict()
+        state.company_execution_contexts[context.task_id] = context.to_dict()
+        state.event('company_execution_context', **context.to_dict())
+        args = self._resolve_action_args(action, outputs, allowed_dependencies=set(context.dependency_steps))
+        covered, coverage_error = self._validate_action_coverage(state, action, args)
+        if not covered:
+            return False, None, coverage_error, False, 0.0
+        if deadline is not None and time.monotonic() >= deadline:
+            return False, None, 'انتهت الميزانية الزمنية قبل تنفيذ الخطوة.', False, 0.0
         errors = tool.validate_args(args)
         if errors:
             return False, None, '; '.join(errors), False, 0.0
+        governance_context = GovernanceContext(
+            task_id=context.task_id,
+            department=context.department,
+            specialist=context.specialist,
+            skill_key=str(action.skill_key or assignment.get('skill_key') or ''),
+            capability=str(action.capability or assignment.get('capability') or ''),
+        )
+        governance = CompanyGovernance(self.company)
+        governance_decision = governance.evaluate(assignment, tool, governance_context, args)
+        state.event('company_governance_decision', step=action.step_id, tool=tool.name,
+                    **governance_decision.to_dict())
+        approval_granted = False
+        if not governance_decision.allowed:
+            state.event('company_governance_denied', step=action.step_id, tool=tool.name,
+                        reasons=list(governance_decision.reasons), risk=governance_decision.risk,
+                        action_class=governance_decision.action_class)
+            reason = '; '.join(governance_decision.reasons) or 'company governance denied this action'
+            return False, None, f'تم رفض العملية بواسطة حوكمة الشركة: {reason}', False, 0.0
+        if governance_decision.human_approval_required:
+            approval = governance_decision.approval
+            before_fingerprint = approval.action_fingerprint if approval else ''
+            state.event('company_governance_approval_requested', step=action.step_id, tool=tool.name,
+                        request_id=approval.request_id if approval else '',
+                        action_fingerprint=before_fingerprint, risk=governance_decision.risk,
+                        reviewers=list(governance_decision.reviewers))
+            approval_granted = bool(approve(tool.name, dict(args)))
+            after_fingerprint = governance.action_fingerprint(task_id=context.task_id, tool=tool, args=dict(args))
+            if approval_granted and before_fingerprint and after_fingerprint != before_fingerprint:
+                state.event('company_governance_approval_scope_changed', step=action.step_id, tool=tool.name,
+                            request_id=approval.request_id if approval else '',
+                            expected_fingerprint=before_fingerprint, actual_fingerprint=after_fingerprint)
+                return False, None, 'تم رفض العملية بواسطة حوكمة الشركة لأن نطاق الموافقة تغيّر.', False, 0.0
+            if not approval_granted:
+                state.event('company_governance_approval_rejected', step=action.step_id, tool=tool.name,
+                            request_id=approval.request_id if approval else '',
+                            action_fingerprint=before_fingerprint)
+                return False, None, 'تم رفض العملية التي تحتاج موافقة حوكمة الشركة.', False, 0.0
+            state.event('company_governance_approval_granted', step=action.step_id, tool=tool.name,
+                        request_id=approval.request_id if approval else '',
+                        action_fingerprint=before_fingerprint)
+
         policy = check_tool(tool, args)
         state.event('policy_check', step=action.step_id, tool=tool.name,
                     allowed=policy.allowed, approval_required=policy.approval_required, reason=policy.reason)
         if not policy.allowed:
             return False, None, policy.reason or 'operation blocked by runtime policy', False, 0.0
-        if policy.approval_required and not approve(tool.name, args):
-            return False, None, 'تم رفض العملية التي تحتاج موافقة.', False, 0.0
+        if policy.approval_required and not approval_granted:
+            if not approve(tool.name, dict(args)):
+                return False, None, 'تم رفض العملية التي تحتاج موافقة.', False, 0.0
         started = time.monotonic()
         from app.runtime.memory_context import (
             current_memory_owner, current_memory_run, push_memory_context, pop_memory_context,
@@ -466,11 +869,30 @@ class CognitiveKernel:
             run_id=current_memory_run(),
         )
         try:
-            result = tool.run(**args)
+            with company_context(context):
+                remaining = (deadline - time.monotonic()) if deadline is not None else None
+                result = self._bounded_tool_run(tool, args, remaining)
         finally:
             pop_memory_context(memory_context_token)
+        # Store only structural output metadata in the department context; raw results remain
+        # transient in the execution engine and are exposed to other tasks only through an
+        # explicit dependency/handoff.
+        context_after = context.to_dict()
+        if isinstance(result.data, dict):
+            produced = tuple(sorted(str(k) for k in result.data.keys()))
+            context_after['produced_output_keys'] = list(produced)
+            context_after['output_summary'] = f'dict:{len(result.data)} keys'
+        else:
+            context_after['output_summary'] = f'type:{type(result.data).__name__}'
+        state.company_execution_contexts[context.task_id] = context_after
         elapsed = time.monotonic() - started
         verified, verification_error = verify_step(tool, args, result)
+        if result.ok and verified:
+            goal_verified, goal_error = self._filesystem_goal_postcondition(state, action, result.data)
+            if not goal_verified:
+                verified = False
+                verification_error = goal_error
+        state.company_active_context = {}
         state.event('action_observed', step=action.step_id, tool=action.tool, ok=result.ok,
                     verified=verified, duration_ms=round(elapsed * 1000, 3),
                     error=result.error or verification_error or '')
@@ -495,6 +917,51 @@ class CognitiveKernel:
             execution_time=float(getattr(tool, 'duration', 0.0) or 0.0),
             uncertainty=1.0,
         )
+
+    def _refresh_company_assignments(self, state: CognitiveState) -> None:
+        """Re-route company ownership after a runtime replanning event.
+
+        The company contract belongs to the current plan, not to a stale pre-replan plan.
+        """
+        assignments = self.company.route_plan(
+            state.goal.objective if state.goal else state.user_text, state.plan, tool_registry=self.registry,
+            project_id=str(getattr(state, 'company_project_id', '') or ''),
+            horizon=str(getattr(state.goal, 'horizon', 'medium') if state.goal else 'medium'),
+        )
+        state.company_coordination = self.company.coordinate(
+            state.goal.objective if state.goal else state.user_text, assignments, tool_registry=self.registry
+        ).to_dict()
+        if state.company_project_id:
+            try:
+                synced = self.company.portfolio.sync_coordination(state.company_project_id, state.company_coordination)
+                state.event('company_project_tasks_synced', project_id=state.company_project_id, task_count=len(synced))
+                state.company_portfolio = self.company.portfolio.snapshot()
+            except Exception as exc:
+                state.event('company_project_task_sync_error', project_id=state.company_project_id, error=f'{type(exc).__name__}: {exc}')
+                raise
+        state.event('company_executive_decomposition',
+                    workstreams=state.company_coordination.get('workstreams', []),
+                    execution_waves=state.company_coordination.get('execution_waves', []),
+                    handoffs=state.company_coordination.get('handoffs', []),
+                    critical_path=state.company_coordination.get('critical_path', []),
+                    required_capabilities=state.company_coordination.get('required_capabilities', []),
+                    unresolved_capabilities=state.company_coordination.get('unresolved_capabilities', []),
+                    validation_errors=state.company_coordination.get('validation_errors', []),
+                    team_formation=state.company_coordination.get('team_formation', {}))
+        state.company_assignments = [
+            {
+                **assignment.to_dict(),
+                'mandate': self.company.mandate(
+                    assignment,
+                    str(getattr(state.plan[i], 'skill_key', '') or '')
+                ).to_dict() if str(getattr(state.plan[i], 'skill_key', '') or '') else {},
+            }
+            for i, assignment in enumerate(assignments)
+        ]
+        state.company_assignment = dict(state.company_assignments[0]) if state.company_assignments else {}
+        state.event('company_workflow_rerouted', assignments=state.company_assignments, coordination=state.company_coordination)
+        for item in state.company_assignments:
+            state.event('company_delegation', **item)
 
     @staticmethod
     def _safe_learning_output(output: Any) -> str:
@@ -628,8 +1095,66 @@ class CognitiveKernel:
             state.event('post_exploration_replan_error', error=f'{type(exc).__name__}: {exc}')
             return []
 
+    @staticmethod
+    def _clone_state_for_parallel_action(state: CognitiveState) -> CognitiveState:
+        """Create an isolated execution view for one parallel-safe tool call.
+
+        Tools receive arguments rather than the CognitiveState, so the clone only needs the
+        read-side planning/organization fields plus fresh per-action mutation containers.
+        Shared durable stores are intentionally not copied; parallel execution is opt-in via
+        Tool.parallel_safe and remains subject to the existing tool policy.
+        """
+        local = copy.copy(state)
+        local.plan = list(state.plan)
+        local.company_assignments = list(state.company_assignments)
+        local.company_coordination = dict(state.company_coordination)
+        local.company_execution_contexts = {}
+        local.company_active_context = {}
+        local.observations = []
+        local.trace = []
+        local.world_facts = dict(state.world_facts)
+        local.uncertainties = list(state.uncertainties)
+        local.action_specs = list(state.action_specs)
+        return local
+
+    def _run_company_parallel_batch(
+        self,
+        state: CognitiveState,
+        actions: tuple[PlannedAction, ...],
+        outputs: dict[str, Any],
+        approve: Callable[[str, dict[str, Any]], bool],
+    ) -> list[tuple[PlannedAction, CognitiveState, tuple[bool, Any, str | None, bool, float]]]:
+        """Execute a scheduler-approved batch concurrently with isolated transient state."""
+        results: list[tuple[PlannedAction, CognitiveState, tuple[bool, Any, str | None, bool, float]]] = []
+        workers = max(2, min(len(actions), 8))
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix='shury-company') as pool:
+            futures = {}
+            for action in actions:
+                local_state = self._clone_state_for_parallel_action(state)
+                futures[pool.submit(self._run_action, local_state, action, dict(outputs), approve)] = (action, local_state)
+            completed: dict[str, tuple[PlannedAction, CognitiveState, tuple[bool, Any, str | None, bool, float]]] = {}
+            for future in as_completed(futures):
+                action, local_state = futures[future]
+                try:
+                    outcome = future.result()
+                except Exception as exc:
+                    outcome = (False, None, f'{type(exc).__name__}: {exc}', False, 0.0)
+                completed[action.step_id] = (action, local_state, outcome)
+        for action in actions:
+            results.append(completed[action.step_id])
+        return results
+
+    @staticmethod
+    def _merge_parallel_state(state: CognitiveState, local_state: CognitiveState) -> None:
+        """Merge only per-action observations, trace, contexts and state facts."""
+        state.trace.extend(local_state.trace)
+        state.observations.extend(local_state.observations)
+        for key, value in local_state.company_execution_contexts.items():
+            state.company_execution_contexts[key] = value
+        state.world_facts.update(local_state.world_facts)
+
     def _execute_result(self, result: BrainResult, *, approve: Callable[[str, dict[str, Any]], bool] | None = None,
-                        max_steps: int = 8, execution_guard: Callable[[], bool] | None = None) -> BrainResult:
+                        max_steps: int = 8, execution_guard: Callable[[], bool] | None = None, deadline: float | None = None) -> BrainResult:
         state = result.state
         if not state.decision or state.decision.kind not in {'execute', 'research'}:
             if state.decision and state.decision.kind == 'retrieve' and state.semantic:
@@ -656,7 +1181,8 @@ class CognitiveKernel:
                 state.event('episodic_memory_recorded', tool_events=0)
             except Exception as exc:
                 state.event('episodic_memory_error', error=f'{type(exc).__name__}: {exc}')
-            return BrainResult(state, response, result.runtime_state, status='completed', run_id=result.run_id)
+            terminal_status = 'needs_user' if state.decision and state.decision.kind == 'clarify' else 'completed'
+            return BrainResult(state, response, result.runtime_state, status=terminal_status, run_id=result.run_id)
 
         outputs: dict[str, Any] = {}
         pending = list(state.plan)
@@ -674,7 +1200,24 @@ class CognitiveKernel:
         learning_transitions: list[dict[str, Any]] = []
         state.event('deliberation_start', plan_length=len(pending))
 
+        from app.organization.recovery import CompanyRecoveryManager
+        company_recovery = CompanyRecoveryManager()
+        recovery_attempted_steps: set[str] = set()
+
+        company_scheduler = CompanyScheduler(default_max_parallelism=4)
+        state.event(
+            'company_execution_schedule',
+            schedule=(getattr(state, 'company_coordination', {}) or {}).get('execution_schedule', []),
+            max_parallelism=(getattr(state, 'company_coordination', {}) or {}).get('schedule_max_parallelism', 4),
+            estimated_duration=(getattr(state, 'company_coordination', {}) or {}).get('schedule_estimated_duration', 0.0),
+        )
+
         while pending:
+            if deadline is not None and time.monotonic() >= deadline:
+                status = 'timeout'
+                final = 'انتهت الميزانية الزمنية قبل اكتمال التنفيذ والتحقق.'
+                state.event('execution_time_budget_exceeded_during_execution')
+                break
             if execution_guard is not None:
                 try:
                     if not execution_guard():
@@ -692,137 +1235,424 @@ class CognitiveKernel:
                 final = 'أوقفت التنفيذ عند الحد المسموح للخطوات.'
                 state.event('execution_limit', max_steps=max_steps)
                 break
-            action = pending.pop(0)
-            if any(dep not in outputs for dep in action.depends_on):
+
+            remaining_slots = max(1, max_steps - executed)
+            batch = company_scheduler.ready_batch(
+                pending, outputs, self.registry, limit=min(company_scheduler.default_max_parallelism, remaining_slots)
+            )
+            if not batch:
                 status = 'failed'
-                final = f'توقفت لأن خطوة {action.step_id} تعتمد على نتيجة لم تتوفر.'
-                state.event('plan_invariant_violation', step=action.step_id, depends_on=list(action.depends_on))
+                blocked = pending[0] if pending else None
+                final = f'توقفت لأن خطوة {getattr(blocked, "step_id", "unknown")} تعتمد على نتيجة لم تتوفر.'
+                state.event('plan_invariant_violation', step=getattr(blocked, 'step_id', 'unknown'),
+                            depends_on=list(getattr(blocked, 'depends_on', ()) or ()))
                 break
-            tool = self.registry.get(action.tool)
-            resolved_args = self._resolve_action_args(action, outputs)
-            state_before = state.to_canonical_state().fingerprint()
-            action_spec = self._action_spec(action, tool, resolved_args) if tool else None
-            exploration_event_id = self._record_exploration_selection(state, action, result.run_id)
-            prediction = None
-            if action_spec is not None:
-                try:
-                    prediction = self.learning.transition_model.predict(state_before, action_spec.to_dict())
-                except Exception:
-                    prediction = None
-            ok, output, error, executed_action, duration = self._run_action(state, action, outputs, approver)
-            if execution_guard is not None:
-                try:
-                    if not execution_guard():
+
+            selected_ids = {action.step_id for action in batch}
+            pending = [action for action in pending if action.step_id not in selected_ids]
+            # Capture learning/exploration metadata BEFORE any action in the batch runs.
+            batch_meta: dict[str, tuple[dict[str, Any], Any, Any, int | None]] = {}
+            batch_state_before = state.to_canonical_state().fingerprint()
+            for action in batch:
+                tool = self.registry.get(action.tool)
+                resolved_args = self._resolve_action_args(action, outputs)
+                action_spec = self._action_spec(action, tool, resolved_args) if tool else None
+                prediction = None
+                if action_spec is not None:
+                    try:
+                        prediction = self.learning.transition_model.predict(batch_state_before, action_spec.to_dict())
+                    except Exception:
+                        prediction = None
+                exploration_event_id = None
+                if len(batch) == 1:
+                    exploration_event_id = self._record_exploration_selection(state, action, result.run_id)
+                batch_meta[action.step_id] = (resolved_args, action_spec, prediction, exploration_event_id)
+
+            if len(batch) > 1 and deadline is None:
+                state.event('company_parallel_batch_started', task_ids=[a.step_id for a in batch],
+                            tools=[a.tool for a in batch], batch_size=len(batch))
+                batch_results = self._run_company_parallel_batch(state, batch, outputs, approver)
+                state.event('company_parallel_batch_completed', task_ids=[a.step_id for a in batch],
+                            batch_size=len(batch))
+            else:
+                action = batch[0]
+                local_state = state
+                batch_results = [(action, local_state,
+                                  self._run_action(state, action, outputs, approver))]
+
+            replan_request: tuple[str, str] | None = None
+            batch_failure = False
+            lease_lost = False
+            for action, local_state, action_result in batch_results:
+                if local_state is not state:
+                    self._merge_parallel_state(state, local_state)
+
+                ok, output, error, executed_action, duration = action_result
+                resolved_args, action_spec, prediction, exploration_event_id = batch_meta[action.step_id]
+                state_before = batch_state_before
+
+                if len(batch) == 1 and execution_guard is not None:
+                    try:
+                        if not execution_guard():
+                            status = 'cancelled'
+                            final = 'تم إيقاف التنفيذ لأن حيازة العملية انتهت.'
+                            state.event('execution_lease_lost_after_action', step=action.step_id)
+                            break
+                    except Exception:
                         status = 'cancelled'
-                        final = 'تم إيقاف التنفيذ لأن حيازة العملية انتهت.'
-                        state.event('execution_lease_lost_after_action', step=action.step_id)
+                        final = 'تم إيقاف التنفيذ لتعذر التحقق من حيازة العملية بعد الخطوة.'
+                        state.event('execution_guard_error_after_action', step=action.step_id)
                         break
-                except Exception:
-                    status = 'cancelled'
-                    final = 'تم إيقاف التنفيذ لتعذر التحقق من حيازة العملية بعد الخطوة.'
-                    state.event('execution_guard_error_after_action', step=action.step_id)
-                    break
-            if not ok:
-                self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=False, verified=False, reward=0.0)
-                if executed_action:
-                    state.observations.append({
-                        'step_id': action.step_id, 'tool': action.tool, 'ok': False,
-                        'error': str(error or 'execution failed'), 'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                    })
+
+                if not ok:
+                    # C9: record organizational execution evidence before any recovery decision.
+                    try:
+                        assignment = next((a for a in state.company_assignments if str(a.get('step_id')) == str(action.step_id)), {})
+                        capability = str(action.capability or assignment.get('capability') or '')
+                        learning_store = getattr(self.learning, 'store', None)
+                        if learning_store is not None and executed_action:
+                            learning_store.record_company_delegation_outcome(
+                                capability=capability, department=str(assignment.get('department') or ''),
+                                specialist=str(assignment.get('specialist') or ''), skill_key=str(assignment.get('skill_key') or action.skill_key or ''),
+                                tool=action.tool, verified=False, duration=duration, run_id=result.run_id,
+                                failure_class=company_recovery.classify_failure(str(error or ''), verification_failed=False),
+                            )
+                    except Exception as exc:
+                        state.event('company_delegation_evidence_error', error=f'{type(exc).__name__}: {exc}')
+
+                    self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=False, verified=False, reward=0.0)
+                    if executed_action:
+                        state_after = state.to_canonical_state().fingerprint()
+                        learning_transitions.append({
+                            'state_before': state_before,
+                            'action': action_spec.to_dict() if action_spec else {},
+                            'predicted_state': prediction.predicted_state if prediction else None,
+                            'state_after': state_after,
+                            'outcome': {'ok': False, 'verified': False, 'error': str(error or 'execution failed'),
+                                        'duration_ms': duration * 1000.0, 'attempt': 1},
+                            'verified': False,
+                            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                            'metadata': (('step_id', action.step_id),),
+                        })
+                    # _run_action already recorded company/tool observations for executed failures.
+                    if not any(item.get('step_id') == action.step_id and item.get('error') == str(error or 'execution failed')
+                               for item in state.observations[-3:]):
+                        state.observations.append({
+                            'step_id': action.step_id, 'tool': action.tool, 'ok': False,
+                            'error': str(error or 'execution failed'), 'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                        })
+                    failed_tools.add(action.tool)
                     state.world_facts[f'action_failed:{action.tool}'] = True
+                    if replan_request is None and error and 'تم رفض' not in str(error):
+                        replan_request = (action.tool, str(error))
+                    batch_failure = True
+                    continue
+
+                if not self._verify_output(action, output):
+                    try:
+                        assignment = next((a for a in state.company_assignments if str(a.get('step_id')) == str(action.step_id)), {})
+                        learning_store = getattr(self.learning, 'store', None)
+                        if learning_store is not None and executed_action:
+                            learning_store.record_company_delegation_outcome(
+                                capability=str(action.capability or assignment.get('capability') or ''),
+                                department=str(assignment.get('department') or ''), specialist=str(assignment.get('specialist') or ''),
+                                skill_key=str(assignment.get('skill_key') or action.skill_key or ''), tool=action.tool, verified=False,
+                                duration=duration, run_id=result.run_id, failure_class='verification',
+                            )
+                    except Exception as exc:
+                        state.event('company_delegation_evidence_error', error=f'{type(exc).__name__}: {exc}')
+                    self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=True, verified=False, reward=0.0)
+                    state.observations.append({
+                        'step_id': action.step_id, 'tool': action.tool, 'ok': True,
+                        'verified': False, 'error': 'verification failed',
+                        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                    })
+                    if executed_action:
+                        state_after = state.to_canonical_state().fingerprint()
+                        learning_transitions.append({
+                            'state_before': state_before,
+                            'action': action_spec.to_dict() if action_spec else {},
+                            'predicted_state': prediction.predicted_state if prediction else None,
+                            'state_after': state_after,
+                            'outcome': {'ok': True, 'verified': False, 'error': 'verification failed',
+                                        'duration_ms': duration * 1000.0, 'attempt': 1},
+                            'verified': False,
+                            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                            'metadata': (('step_id', action.step_id),),
+                        })
+                    batch_failure = True
+                    final = f'نفذت {action.tool} لكن التحقق من النتيجة لم ينجح.'
+                    state.event('verification_failed', step=action.step_id, tool=action.tool)
+                    if replan_request is None:
+                        replan_request = (action.tool, 'verification failed: ' + str(error or 'verification failed'))
+                    continue
+
+                try:
+                    assignment = next((a for a in state.company_assignments if str(a.get('step_id')) == str(action.step_id)), {})
+                    capability = str(action.capability or assignment.get('capability') or '')
+                    learning_store = getattr(self.learning, 'store', None)
+                    if learning_store is not None:
+                        learning_store.record_company_delegation_outcome(
+                            capability=capability, department=str(assignment.get('department') or ''),
+                            specialist=str(assignment.get('specialist') or ''), skill_key=str(assignment.get('skill_key') or action.skill_key or ''),
+                            tool=action.tool, verified=True, duration=duration, run_id=result.run_id, failure_class='',
+                        )
+                except Exception as exc:
+                    state.event('company_delegation_evidence_error', error=f'{type(exc).__name__}: {exc}')
+
+                outputs[action.step_id] = output
+                executed += 1
+                resolved_action = replace(action, args=resolved_args)
+                state.plan = [resolved_action if step.step_id == action.step_id else step for step in state.plan]
+                self._observe_output(state, resolved_action, output)
+                self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=True, verified=True, reward=1.0)
+                if executed_action:
                     state_after = state.to_canonical_state().fingerprint()
                     learning_transitions.append({
                         'state_before': state_before,
                         'action': action_spec.to_dict() if action_spec else {},
                         'predicted_state': prediction.predicted_state if prediction else None,
                         'state_after': state_after,
-                        'outcome': {'ok': False, 'verified': False, 'error': str(error or 'execution failed'),
-                                    'duration_ms': duration * 1000.0, 'attempt': 1},
-                        'verified': False,
+                        'outcome': {'ok': True, 'verified': True, 'error': '',
+                                    'duration_ms': duration * 1000.0, 'attempt': 1,
+                                    'output_summary': self._safe_learning_output(output)},
+                        'verified': True,
                         'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
                         'metadata': (('step_id', action.step_id),),
                     })
-                state.observations.append({
-                    'step_id': action.step_id, 'tool': action.tool, 'ok': False,
-                    'error': str(error or 'execution failed'), 'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                }) if not executed_action else None
-                failed_tools.add(action.tool)
-                state.world_facts[f'action_failed:{action.tool}'] = True
-                # Replan from observed state, but never bypass an explicit approval denial.
-                if error and 'تم رفض' not in str(error):
-                    candidates = discover_candidates(state.semantic, self.registry) if state.semantic else []
-                    replacement = replan(state.goal, state.semantic, candidates, state=state, experiences=self.experiences,
-                                         failed_tool=action.tool, learning=self.learning, registry=self.registry) if state.goal and state.semantic else []
+                state.event('step_completed', step=action.step_id, tool=action.tool,
+                            executed_steps=executed, replans=replans)
+                if state.company_project_id:
+                    try:
+                        self.company.portfolio.mark_task_status(state.company_project_id, action.step_id, 'completed')
+                    except Exception as exc:
+                        state.event('company_project_task_status_error', project_id=state.company_project_id, task_id=action.step_id, error=f'{type(exc).__name__}: {exc}')
+
+                if action.exploration_mode and executed < max_steps:
+                    replacement = self._replan_after_exploration(state, explored_tool=action.tool)
                     if replacement:
+                        replan_request = None
                         replans += 1
                         self._learning_replans = replans
                         state.plan = replacement
-                        state.event('replan', failed_tool=action.tool, reason='observed_failure',
-                                    new_plan=[x.to_dict() for x in replacement], replan_count=replans)
-                        # A replan may contain already-satisfied steps; planner removes them from state.
+                        self._refresh_company_assignments(state)
+                        state.event('exploration_replan', explored_tool=action.tool, mode=action.exploration_mode,
+                                    information_gain=action.information_gain, new_plan=[x.to_dict() for x in replacement])
                         pending = replacement + pending
-                        continue
-                status = 'failed'
-                final = f'التنفيذ توقف: {error}'
-                break
-            if not self._verify_output(action, output):
-                self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=True, verified=False, reward=0.0)
-                state.observations.append({
-                    'step_id': action.step_id, 'tool': action.tool, 'ok': True,
-                    'verified': False, 'error': 'verification failed',
-                    'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                })
-                if executed_action:
-                    state_after = state.to_canonical_state().fingerprint()
-                    learning_transitions.append({
-                        'state_before': state_before,
-                        'action': action_spec.to_dict() if action_spec else {},
-                        'predicted_state': prediction.predicted_state if prediction else None,
-                        'state_after': state_after,
-                        'outcome': {'ok': True, 'verified': False, 'error': 'verification failed',
-                                    'duration_ms': duration * 1000.0, 'attempt': 1},
-                        'verified': False,
-                        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                        'metadata': (('step_id', action.step_id),),
-                    })
-                status = 'failed'
-                final = f'نفذت {action.tool} لكن التحقق من النتيجة لم ينجح.'
-                state.event('verification_failed', step=action.step_id, tool=action.tool)
-                break
-            outputs[action.step_id] = output
-            executed += 1
-            resolved_action = replace(action, args=resolved_args)
-            state.plan = [resolved_action if step.step_id == action.step_id else step for step in state.plan]
-            self._observe_output(state, resolved_action, output)
-            self._complete_exploration_event(state, exploration_event_id, executed=executed_action, ok=True, verified=True, reward=1.0)
-            if executed_action:
-                state_after = state.to_canonical_state().fingerprint()
-                learning_transitions.append({
-                    'state_before': state_before,
-                    'action': action_spec.to_dict() if action_spec else {},
-                    'predicted_state': prediction.predicted_state if prediction else None,
-                    'state_after': state_after,
-                    'outcome': {'ok': True, 'verified': True, 'error': '',
-                                'duration_ms': duration * 1000.0, 'attempt': 1, 'output_summary': self._safe_learning_output(output)},
-                    'verified': True,
-                    'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
-                    'metadata': (('step_id', action.step_id),),
-                })
-            state.event('step_completed', step=action.step_id, tool=action.tool, executed_steps=executed, replans=replans)
+                        break
 
-            if action.exploration_mode and executed < max_steps:
-                replacement = self._replan_after_exploration(state, explored_tool=action.tool)
+            if deadline is not None and time.monotonic() >= deadline:
+                status = 'timeout'
+                final = 'انتهت الميزانية الزمنية قبل اكتمال التحقق من الخطوة.'
+                state.event('execution_time_budget_exceeded_after_batch')
+            if len(batch) > 1 and execution_guard is not None:
+                try:
+                    lease_lost = not bool(execution_guard())
+                except Exception:
+                    lease_lost = True
+                if lease_lost:
+                    state.event('execution_lease_lost_after_parallel_batch', task_ids=[a.step_id for a in batch])
+                    status = 'cancelled'
+                    final = 'تم إيقاف التنفيذ لأن حيازة العملية انتهت بعد تشغيل الدفعة المتوازية.'
+
+            if status in {'failed', 'cancelled', 'timeout'}:
+                break
+            if replan_request is not None:
+                failed_tool, failure_reason = replan_request
+                failed_action = next((item for item in batch if item.tool == failed_tool), None)
+                # C9: recover at the organizational boundary before the generic planner.
+                # A failed specialist is not replaced by guesswork; only a qualified alternative
+                # with verified same-capability evidence may be selected automatically.
+                if failed_action is not None and failed_action.step_id not in recovery_attempted_steps:
+                    recovery_attempted_steps.add(failed_action.step_id)
+                    assignment = next((a for a in state.company_assignments if str(a.get('step_id')) == str(failed_action.step_id)), {})
+                    recovery = company_recovery.decide(
+                        action=failed_action, error=failure_reason, organization=self.company.registry,
+                        tool_registry=self.registry, learning_store=getattr(self.learning, 'store', None),
+                    )
+                    state.event('company_recovery_decision', **recovery.to_dict(),
+                                assigned_department=assignment.get('department', ''),
+                                assigned_specialist=assignment.get('specialist', ''))
+                    coordination = dict(getattr(state, 'company_coordination', {}) or {})
+                    decisions = list(coordination.get('recovery_decisions') or [])
+                    decisions.append(recovery.to_dict())
+                    active = list(coordination.get('active_redelegations') or [])
+                    if recovery.decision == 'redelegate':
+                        replacement_action = company_recovery.redelegate_action(failed_action, recovery, self.registry)
+                        if replacement_action is not None:
+                            replans += 1
+                            self._learning_replans = replans
+                            state.plan = [replacement_action if item.step_id == failed_action.step_id else item for item in state.plan]
+                            self._refresh_company_assignments(state)
+                            active.append({
+                                'step_id': failed_action.step_id, 'from_tool': failed_action.tool,
+                                'to_tool': replacement_action.tool, 'from_specialist': assignment.get('specialist', ''),
+                                'reason': recovery.reason, 'confidence': recovery.confidence,
+                            })
+                            coordination['recovery_decisions'] = decisions
+                            coordination['active_redelegations'] = active
+                            state.company_coordination = coordination
+                            state.event('company_redelegated', step=failed_action.step_id,
+                                        from_tool=failed_action.tool, to_tool=replacement_action.tool,
+                                        department=recovery.selected.department if recovery.selected else '',
+                                        specialist=recovery.selected.specialist if recovery.selected else '',
+                                        confidence=recovery.confidence)
+                            pending = [replacement_action] + pending
+                            continue
+                    coordination['recovery_decisions'] = decisions
+                    state.company_coordination = coordination
+                    if recovery.decision == 'escalate':
+                        status = 'failed'
+                        final = f'التنفيذ توقف: {failure_reason}. لم تجد الشركة بديلًا مؤهلًا تدعمه أدلة نجاح موثقة.'
+                        state.event('company_recovery_escalated', step=failed_action.step_id, reason=recovery.reason)
+                        break
+                    if recovery.decision == 'redelegate':
+                        status = 'failed'
+                        final = f'التنفيذ توقف: {failure_reason}. تعذر تطبيق إعادة التفويض الآمنة.'
+                        state.event('company_recovery_escalated', step=failed_action.step_id, reason='selected recovery candidate could not be materialized safely')
+                        break
+
+                # Company-owned actions do not fall back to an unrelated generic replan after
+                # C9 recovery has been evaluated. This prevents evidence-free reassignment.
+                if failed_action is not None:
+                    if state.company_project_id:
+                        try:
+                            self.company.portfolio.mark_task_status(state.company_project_id, failed_action.step_id, 'failed')
+                        except Exception as exc:
+                            state.event('company_project_task_status_error', project_id=state.company_project_id, task_id=failed_action.step_id, error=f'{type(exc).__name__}: {exc}')
+                    status = 'failed'
+                    final = f'التنفيذ توقف: {failure_reason}. لا يوجد مسار Company آمن بديل بعد تقييم الاسترجاع.'
+                    break
+
+                candidates = discover_candidates(state.semantic, self.registry) if state.semantic else []
+                replacement = replan(state.goal, state.semantic, candidates, state=state, experiences=self.experiences,
+                                     failed_tool=failed_tool, learning=self.learning, registry=self.registry) if state.goal and state.semantic else []
                 if replacement:
                     replans += 1
                     self._learning_replans = replans
                     state.plan = replacement
-                    state.event('exploration_replan', explored_tool=action.tool, mode=action.exploration_mode,
-                                information_gain=action.information_gain, new_plan=[x.to_dict() for x in replacement])
+                    self._refresh_company_assignments(state)
+                    state.event('replan', failed_tool=failed_tool, reason='observed_failure',
+                                failure=failure_reason,
+                                new_plan=[x.to_dict() for x in replacement], replan_count=replans)
                     pending = replacement + pending
                     continue
+                status = 'failed'
+                final = f'التنفيذ توقف: {failure_reason}'
+                break
+
+        skill_verification = {"verified": True, "checks": [], "errors": []}
+        if status == 'completed' and state.selected_skill is not None:
+            skill_verification = verify_skill_contract(state.selected_skill, state, outputs)
+            state.event('skill_verification', selected_skill=getattr(state.selected_skill, 'key', ''), **skill_verification)
+            if not skill_verification['verified']:
+                status = 'failed'
+                final = 'نفذت خطوات المهارة، لكن تحقق المهارة ككل لم يثبت إنجاز الهدف.'
+                state.event('skill_verification_failed', selected_skill=getattr(state.selected_skill, 'key', ''),
+                            errors=list(skill_verification.get('errors', ())))
 
         state.event('post_action_evaluation', outputs={k: str(v)[:500] for k, v in outputs.items()},
                     executed_steps=executed, replans=replans)
+        company_review = None
+        if status == 'completed' and getattr(state, 'company_assignments', None):
+            company_operation = str(getattr(state.semantic, 'requested_operation', '') or '')
+            company_review = review_company_execution(
+                goal=state.goal.objective if state.goal else state.user_text,
+                operation=company_operation, plan=state.plan,
+                assignments=state.company_assignments, status=status,
+                outputs=outputs, observations=state.observations,
+                coordination=getattr(state, 'company_coordination', None),
+            )
+            state.event('company_qa_review', **company_review.to_dict())
+            if not company_review.ok:
+                status = 'failed'
+                final = company_review.reason
+            else:
+                final = company_review.final_message
+        state.company_review = company_review.to_dict() if company_review else {}
+
+        # C11: verify that skills which depend on external evidence actually carry
+        # machine-readable provenance from the observed tool outputs. The evidence
+        # policy is fail-closed for governed skills and never promotes raw web prose
+        # into trusted knowledge.
+        state.company_evidence = []
+        if status == 'completed' and getattr(state, 'company_assignments', None):
+            skill_keys = tuple(dict.fromkeys(str(a.get('skill_key') or '') for a in state.company_assignments if str(a.get('skill_key') or '')))
+            for skill_key in skill_keys:
+                try:
+                    assessment = self.company_evidence.assess_outputs(skill_key, outputs)
+                    state.company_evidence.append(assessment.to_dict())
+                except Exception as exc:
+                    state.company_evidence.append({'skill_key': skill_key, 'ok': False, 'reason': 'evidence_policy_error', 'error': f'{type(exc).__name__}: {exc}'})
+            failed_evidence = [item for item in state.company_evidence if not bool(item.get('ok', False))]
+            if failed_evidence:
+                status = 'failed'
+                final = 'التنفيذ اكتمل ظاهريًا، لكن متطلبات provenance للأدلة لم تثبت.'
+                state.event('company_evidence_failed', assessments=state.company_evidence)
+            else:
+                state.event('company_evidence_verified', assessments=state.company_evidence)
+        company_outcome_verified = bool(status == 'completed' and (company_review.ok if company_review else True))
+
+        # C10: persist structured organizational knowledge only after execution/review outcome.
+        # Raw user text and transient task context are intentionally excluded.
+        try:
+            assignments = list(getattr(state, 'company_assignments', []) or [])
+            for item in assignments:
+                self.company_memory.remember_ownership(
+                    subject=str(item.get('tool') or item.get('capability') or item.get('skill_key') or item.get('operation') or 'unknown'),
+                    department=str(item.get('department') or ''), role=str(item.get('specialist') or item.get('department_head') or ''),
+                    skill=str(item.get('skill_key') or ''), capability=str(item.get('capability') or ''), tool=str(item.get('tool') or ''),
+                    evidence=(f"company-assignment:{item.get('step_id')}",),
+                    project_id=str(getattr(state, 'company_project_id', '') or '') or None,
+                )
+            coord = dict(getattr(state, 'company_coordination', {}) or {})
+            team = dict(coord.get('team_formation') or {})
+            if team:
+                self.company_memory.remember_decision(
+                    decision_key=str(state.goal.name if state.goal else 'company-task'),
+                    decision={'status': status, 'departments': list(team.get('departments') or []),
+                              'members': list(team.get('members') or []), 'requirement_keys': list(team.get('requirement_keys') or [])},
+                    evidence=tuple(str(x) for x in (coord.get('critical_path') or ())), run_id=result.run_id,
+                )
+            if company_review:
+                self.company_memory.remember_review_finding(
+                    review_key=str(state.goal.name if state.goal else result.run_id),
+                    finding={'ok': bool(company_review.ok), 'reason': company_review.reason, 'checks': list(company_review.checks)},
+                    blocking=not bool(company_review.ok), evidence=tuple(str(x) for x in (company_review.checks or ())),
+                    run_id=result.run_id,
+                    project_id=str(getattr(state, 'company_project_id', '') or '') or None,
+                )
+            self.company_memory.remember_outcome(
+                run_id=result.run_id, status=status,
+                summary={'departments': list(dict.fromkeys(str(x.get('department') or '') for x in assignments if x.get('department'))),
+                         'tools': list(dict.fromkeys(str(x.get('tool') or '') for x in assignments if x.get('tool'))),
+                         'status': status, 'verified': company_outcome_verified, 'review_ok': bool(company_review.ok) if company_review else None,
+                         'replans': int(replans), 'project_id': str(getattr(state, 'company_project_id', '') or '')},
+                verified=company_outcome_verified,
+                project_id=str(getattr(state, 'company_project_id', '') or '') or None,
+            )
+            if status == 'completed' and (company_review is None or company_review.ok):
+                for item in assignments:
+                    tool_name, capability = str(item.get('tool') or ''), str(item.get('capability') or '')
+                    if tool_name and capability:
+                        self.company_memory.remember_procedure(
+                            capability=capability, skill=str(item.get('skill_key') or ''), tool=tool_name,
+                            procedure={'step_id': str(item.get('step_id') or ''), 'expected_effects': list(item.get('expected_effects') or [])},
+                            evidence=(f"verified-run:{result.run_id}",), run_id=result.run_id,
+                        )
+            if status != 'completed':
+                for item in assignments:
+                    capability = str(item.get('capability') or '')
+                    if capability:
+                        self.company_memory.remember_failure_lesson(
+                            capability=capability, failure_class='company_execution_failure',
+                            lesson={'status': status, 'tool': str(item.get('tool') or ''), 'specialist': str(item.get('specialist') or '')},
+                            evidence=(f"failed-run:{result.run_id}",), run_id=result.run_id,
+                        )
+            state.event('company_memory_persisted', stats=self.company_memory.stats())
+        except Exception as exc:
+            state.event('company_memory_persistence_error', error=f'{type(exc).__name__}: {exc}')
+
         if status == 'completed':
             final = compose_action_result(state, action=action if 'action' in locals() else None, output=output if 'output' in locals() else None, all_outputs=outputs)
             verified = True
@@ -859,6 +1689,14 @@ class CognitiveKernel:
             total_elapsed = round(sum(float(item.get('duration_ms') or 0.0) for item in episode_tools) / 1000.0, 3)
             contract_verified = verified and all(bool(item.get('verified')) for item in episode_tools) if episode_tools else verified
 
+            semantic_entities = [
+                {
+                    'type': str(getattr(entity, 'type', 'entity') or 'entity'),
+                    'text': str(getattr(entity, 'text', '') or getattr(entity, 'canonical', '') or ''),
+                }
+                for entity in (tuple(getattr(state.semantic, 'entities', ()) or ()))
+            ]
+
             execution_record = {
                 'selected_skill': selected_skill_key,
                 'inputs': contract_inputs,
@@ -868,6 +1706,7 @@ class CognitiveKernel:
                 'errors': errors_list,
                 'elapsed_execution': total_elapsed,
                 'verification_result': contract_verified,
+                'skill_verification': skill_verification,
             }
             state.event('execution_record', **execution_record)
 
@@ -926,25 +1765,64 @@ class CognitiveKernel:
             # Learning is important, but it is never allowed to take execution authority or
             # bring down a completed user action. The event makes the degradation inspectable.
             state.event('learning_error', error=f'{type(exc).__name__}: {exc}')
-        return BrainResult(state, final, runtime_state={'outputs': outputs, 'executed_steps': executed, 'status': status, 'replans': replans}, status=status, run_id=result.run_id)
+        return BrainResult(state, final, runtime_state={
+            'outputs': outputs, 'executed_steps': executed, 'status': status, 'replans': replans,
+            'company_assignment': dict(getattr(state, 'company_assignment', {}) or {}),
+            'company_assignments': list(getattr(state, 'company_assignments', []) or []),
+            'company_review': dict(getattr(state, 'company_review', {}) or {}),
+            'company_coordination': dict(getattr(state, 'company_coordination', {}) or {}),
+            'company_memory': list(getattr(state, 'company_memory', []) or []),
+            'company_evidence': list(getattr(state, 'company_evidence', []) or []),
+            'company_project_id': str(getattr(state, 'company_project_id', '') or ''),
+            'company_project_context': dict(getattr(state, 'company_project_context', {}) or {}),
+            'company_portfolio': dict(getattr(state, 'company_portfolio', {}) or {}),
+        }, status=status, run_id=result.run_id)
 
     def act(self, user_text: str, *, approve: Callable[[str, dict[str, Any]], bool] | None = None,
-            session_id: str | None = None, max_steps: int = 8, execution_guard: Callable[[], bool] | None = None) -> BrainResult:
+            session_id: str | None = None, max_steps: int = 8, execution_guard: Callable[[], bool] | None = None, max_seconds: float | None = None) -> BrainResult:
         sid = session_id or uuid.uuid4().hex
         memory_token = push_memory(self.memory)
         try:
-            result = self.think(user_text, session_id=sid)
-            return self._execute_result(result, approve=approve, max_steps=max_steps, execution_guard=execution_guard)
+            deadline = time.monotonic() + float(max_seconds) if max_seconds is not None else None
+            remaining = (deadline - time.monotonic()) if deadline is not None else None
+            ok, result, error = self._bounded_call(
+                lambda: self.think(user_text, session_id=sid), remaining
+            )
+            if not ok:
+                state = CognitiveState(user_text=user_text, session_id=sid)
+                state.event('execution_time_budget_exceeded_during_think' if error == 'execution timeout' else 'think_error',
+                            error=error or 'unknown think failure')
+                status = 'timeout' if error == 'execution timeout' else 'failed'
+                response = 'انتهت الميزانية الزمنية قبل بدء التنفيذ.' if status == 'timeout' else f'فشل التفكير قبل التنفيذ: {error}'
+                return BrainResult(state, response, None, status=status, run_id=uuid.uuid4().hex)
+            if deadline is not None and time.monotonic() >= deadline:
+                result.state.event('execution_time_budget_exceeded_before_execution')
+                return BrainResult(result.state, 'انتهت الميزانية الزمنية قبل بدء التنفيذ.', result.runtime_state, status='timeout', run_id=result.run_id)
+            return self._execute_result(result, approve=approve, max_steps=max_steps, execution_guard=execution_guard, deadline=deadline)
         finally:
             pop_memory(memory_token)
 
     def act_structured(self, payload: dict[str, Any] | GoalSpec, *,
                        approve: Callable[[str, dict[str, Any]], bool] | None = None,
-                       session_id: str | None = None, max_steps: int = 8, execution_guard: Callable[[], bool] | None = None) -> BrainResult:
+                       session_id: str | None = None, max_steps: int = 8, execution_guard: Callable[[], bool] | None = None, max_seconds: float | None = None) -> BrainResult:
         memory_token = push_memory(self.memory)
         try:
-            result = self.think_structured(payload, session_id=session_id)
-            return self._execute_result(result, approve=approve, max_steps=max_steps, execution_guard=execution_guard)
+            deadline = time.monotonic() + float(max_seconds) if max_seconds is not None else None
+            remaining = (deadline - time.monotonic()) if deadline is not None else None
+            ok, result, error = self._bounded_call(
+                lambda: self.think_structured(payload, session_id=session_id), remaining
+            )
+            if not ok:
+                state = CognitiveState(user_text=str(getattr(payload, 'objective', None) or (payload.get('objective', '') if isinstance(payload, dict) else '')), session_id=session_id)
+                state.event('execution_time_budget_exceeded_during_think' if error == 'execution timeout' else 'think_error',
+                            error=error or 'unknown think failure')
+                status = 'timeout' if error == 'execution timeout' else 'failed'
+                response = 'انتهت الميزانية الزمنية قبل بدء التنفيذ.' if status == 'timeout' else f'فشل التفكير قبل التنفيذ: {error}'
+                return BrainResult(state, response, None, status=status, run_id=uuid.uuid4().hex)
+            if deadline is not None and time.monotonic() >= deadline:
+                result.state.event('execution_time_budget_exceeded_before_execution')
+                return BrainResult(result.state, 'انتهت الميزانية الزمنية قبل بدء التنفيذ.', result.runtime_state, status='timeout', run_id=result.run_id)
+            return self._execute_result(result, approve=approve, max_steps=max_steps, execution_guard=execution_guard, deadline=deadline)
         finally:
             pop_memory(memory_token)
 
@@ -1005,8 +1883,14 @@ class CognitiveKernel:
                 state.beliefs = self._load_beliefs(sid)
                 self._sync_legacy_fact(sid, predicate)
         elif action.tool == 'forget_fact':
-            # Deletion is authoritative in Memory; immediately refresh the derived Brain view so
-            # the returned state cannot expose a belief that was just deleted.
+            # Deletion is authoritative in canonical Memory. Remove the mirrored LearningStore
+            # belief projection as well, then reload so no retrievable derived copy survives.
+            predicate = str(action.args.get('key') or '')
+            if predicate and sid:
+                try:
+                    self.experiences.delete_belief(session_id=sid, subject='user', predicate=predicate)
+                except Exception:
+                    pass
             state.beliefs = self._load_beliefs(sid)
         elif action.tool == 'recall_fact':
             predicate = str(action.args.get('key') or '')

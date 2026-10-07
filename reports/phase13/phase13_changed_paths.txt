@@ -1,6 +1,0 @@
-reports/phase13/failure_inventory.json
-reports/phase13/failure_clusters.md
-reports/phase13/individual_tests.txt
-reports/phase13/test_run_raw.txt
-reports/phase13/phase13_result.md
-reports/phase13/phase13_changed_paths.txt

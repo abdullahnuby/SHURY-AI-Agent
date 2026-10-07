@@ -38,6 +38,7 @@ def _quoted_or_tail(goal: str, marker_words=()):
     verification_level="strong",
     intent_priority=8, exploration_safe=True, emits_world_delta=False,
     information_domains=("research", "current_data", "learning", "external_web"), information_gain_prior=0.88,
+    organization_department="research", organization_role="research:research-analyst",
 )
 def web_research_tool(query: str):
     return WebResearchEngine().research(query, limit=5, index=True)
@@ -86,6 +87,7 @@ def http_get_tool(url: str):
     verification_level="strong",
     intent_priority=10, exploration_safe=True, emits_world_delta=False,
     information_domains=("research", "current_data", "learning", "development", "external_web"), information_gain_prior=0.92,
+    organization_department="research", organization_role="research:research-analyst",
 )
 def internet_research_tool(query: str):
     return WebResearchEngine().internet_research(query, web_limit=5, paper_limit=6, repo_limit=5, index=True)
