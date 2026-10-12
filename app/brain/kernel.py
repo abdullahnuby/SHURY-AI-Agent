@@ -24,6 +24,8 @@ from app.knowledge.memory_controller import MemoryController
 from app.learning.manager import SelfImprovementManager
 from app.learning.store import LearningStore
 from app.domain.plan import Plan, PlanStep
+from app.domain.task_graph import TaskGraph, TaskNode
+from app.agents import AgentDispatcher, AgentRegistry, AgentResult, AgentTask, DataAgent, DevelopmentAgent, ResearchAgent, VerifierAgent
 from app.runtime.registry import Tool, load_tools
 from app.runtime.policy import check_tool
 from app.runtime.verify import verify_step
@@ -52,10 +54,13 @@ class CognitiveKernel:
     def __init__(self, *, memory=None, registry: dict[str, Tool] | None = None,
                  state_store: BrainStateStore | None = None,
                  experience_store: LearningStore | None = None,
-                 learning_manager: SelfImprovementManager | None = None):
+                 learning_manager: SelfImprovementManager | None = None,
+                 specialist_registry: AgentRegistry | None = None):
         self.memory = memory or get_memory()
         self.memory_controller = MemoryController(self.memory)
         self.registry = registry or load_tools()
+        self.specialist_registry = specialist_registry or AgentRegistry([DataAgent(), DevelopmentAgent(), ResearchAgent(), VerifierAgent()])
+        self.specialist_dispatcher = AgentDispatcher(self.specialist_registry)
         self.state_store = state_store or BrainStateStore()
         learning_store = None
         if isinstance(experience_store, LearningStore):
@@ -65,6 +70,233 @@ class CognitiveKernel:
         self.learning = learning_manager or SelfImprovementManager(store=learning_store)
         self.experiences = self.learning.store
         self.self_model = SelfModel(self.registry, self.experiences)
+
+    def register_specialist(self, agent: Any) -> Any:
+        """Register a specialist under the kernel's canonical policy boundary.
+
+        The kernel remains the authority; specialist modules remain subordinate, capability-scoped,
+        and fail-closed if they cannot validate their own result payloads.
+        """
+        return self.specialist_registry.register(agent)
+
+    def dispatch_specialist_task(self, task: AgentTask | dict[str, Any], *, session_id: str | None = None) -> Any:
+        """Kick a specialist task through the registry while keeping the kernel as the caller.
+
+        This is intentionally minimal: it does not become a second planner and does not alter
+        the core tool policy path. It simply exposes a safe registry handoff for capability-scoped
+        tasks such as dataset analysis and reporting.
+        """
+        if isinstance(task, dict):
+            task_obj = AgentTask(
+                task_id=str(task.get("task_id") or f"spec-{uuid.uuid4().hex[:8]}"),
+                objective=str(task.get("objective") or task.get("goal") or "specialist task"),
+                capability=str(task.get("capability") or ""),
+                inputs=dict(task.get("inputs") or {}),
+                dependencies=tuple(task.get("dependencies") or ()),
+                success_conditions=tuple(task.get("success_conditions") or ()),
+                authority_scope=tuple(task.get("authority_scope") or ()),
+                timeout_seconds=float(task.get("timeout_seconds") or 30.0),
+            )
+        else:
+            task_obj = task
+        result = self.specialist_dispatcher.dispatch(task_obj)
+        if session_id:
+            self.state_store.append_event(session_id, "specialist_dispatched", {
+                "task_id": task_obj.task_id,
+                "capability": task_obj.capability,
+                "status": result.status,
+                "evidence": list(result.evidence),
+            })
+        return result
+
+    def execute_specialist_graph(self, graph: TaskGraph | list[TaskNode], *, session_id: str | None = None) -> AgentResult:
+        """Execute a specialist DAG serially while keeping the kernel as the authority.
+
+        The graph is validated first, then ready tasks are dispatched in deterministic order. This
+        creates a bounded workflow gate without introducing parallel scheduling or extra planner
+        authority.
+        """
+        if isinstance(graph, list):
+            graph = TaskGraph(graph)
+
+        validation_errors = graph.validate()
+        if validation_errors:
+            return AgentResult(
+                task_id=f"kernel-graph-{uuid.uuid4().hex[:8]}",
+                status="blocked",
+                errors=tuple(validation_errors),
+                metadata={"kind": "graph_validation", "graph": graph.to_dict()},
+            )
+
+        order: list[str] = []
+        result_map: dict[str, Any] = {}
+        evidence: list[str] = []
+        while True:
+            ready_nodes = sorted(graph.ready(), key=lambda node: node.id)
+            if not ready_nodes:
+                if not order:
+                    return AgentResult(
+                        task_id=f"kernel-graph-{uuid.uuid4().hex[:8]}",
+                        status="blocked",
+                        errors=("no executable steps in graph",),
+                        metadata={"kind": "graph_execution", "graph": graph.to_dict()},
+                    )
+                break
+
+            node = ready_nodes[0]
+            if node.tool in {"profile_dataset", "analyze_dataset"}:
+                task_capability = "data_analysis"
+            elif node.tool in {"verify_dataset_result", "verify_result", "verify_dataset_analysis"}:
+                task_capability = "verification"
+            else:
+                task_capability = str(node.tool)
+            task_inputs = dict(node.args)
+            if node.tool == "profile_dataset":
+                task_inputs.setdefault("mode", "profile")
+            elif node.tool == "analyze_dataset":
+                task_inputs.setdefault("mode", "analysis")
+            task = AgentTask(
+                task_id=f"kernel-{node.id}-{uuid.uuid4().hex[:8]}",
+                objective=str(node.tool),
+                capability=task_capability,
+                inputs=task_inputs,
+                dependencies=tuple(node.depends_on),
+                timeout_seconds=30.0,
+            )
+            node.status = "running"
+            result = self.dispatch_specialist_task(task, session_id=session_id)
+            node.status = "done" if result.status == "success" else "failed"
+            order.append(node.id)
+            result_map[node.id] = result.output
+            evidence.extend(result.evidence)
+
+            if result.status in {"blocked", "failed", "needs_input", "timeout"}:
+                return AgentResult(
+                    task_id=task.task_id,
+                    status=result.status,
+                    output={"order": order, "results": result_map, "graph": graph.to_dict()},
+                    errors=result.errors,
+                    evidence=tuple(evidence),
+                    metadata={"kind": "graph_execution", "node": node.id, "tool": node.tool},
+                )
+
+        return AgentResult(
+            task_id=f"kernel-graph-{uuid.uuid4().hex[:8]}",
+            status="success",
+            output={"order": order, "results": result_map, "graph": graph.to_dict()},
+            evidence=tuple(evidence),
+            metadata={"kind": "specialist_graph", "graph": graph.to_dict()},
+        )
+
+    def run_specialist_workflow(self, *, dataset_path: str, question: str | None = None,
+                               session_id: str | None = None) -> AgentResult:
+        """Execute a minimal, serial specialist workflow under the kernel's authority.
+
+        This is intentionally a single, read-only pipeline: profile first, then optional analysis,
+        then independent verification. The kernel keeps policy/validation/approval authority and
+        merges the specialist results in a deterministic, bounded order.
+        """
+        if not dataset_path or not str(dataset_path).strip():
+            return AgentResult(
+                task_id=f"kernel-workflow-{uuid.uuid4().hex[:8]}",
+                status="blocked",
+                errors=("dataset_path is required",),
+                metadata={"kind": "workflow_validation"},
+            )
+
+        graph = TaskGraph([
+            TaskNode("profile", "profile_dataset", {"path": str(dataset_path)}),
+        ])
+        if question and str(question).strip():
+            graph.nodes.append(TaskNode(
+                "analysis",
+                "analyze_dataset",
+                {"path": str(dataset_path), "question": str(question).strip()},
+                depends_on=["profile"],
+            ))
+
+        workflow_result = self.execute_specialist_graph(graph, session_id=session_id)
+        if workflow_result.status != "success":
+            return workflow_result
+
+        profile_output = workflow_result.output["results"].get("profile")
+        workflow_output: dict[str, Any] = {"profile": profile_output}
+        evidence: list[str] = list(workflow_result.evidence or ())
+
+        if question and str(question).strip():
+            analysis_output = workflow_result.output["results"].get("analysis")
+            workflow_output["analysis"] = analysis_output
+            verification_task = AgentTask(
+                task_id=f"kernel-verify-{uuid.uuid4().hex[:8]}",
+                objective="Validate the analysis result for the dataset.",
+                capability="verification",
+                inputs={"profile": profile_output, "analysis": analysis_output},
+                timeout_seconds=15.0,
+            )
+            verification_result = self.dispatch_specialist_task(verification_task, session_id=session_id)
+            if verification_result.status in {"blocked", "failed", "needs_input", "timeout"}:
+                return AgentResult(
+                    task_id=verification_task.task_id,
+                    status=verification_result.status,
+                    output={"profile": profile_output, "analysis": analysis_output},
+                    errors=verification_result.errors,
+                    evidence=verification_result.evidence,
+                    metadata={"kind": "workflow_verification", **(verification_result.metadata or {})},
+                )
+            workflow_output["verification"] = verification_result.output
+            evidence.extend(verification_result.evidence or ())
+
+        return AgentResult(
+            task_id=workflow_result.task_id,
+            status="success",
+            output=workflow_output,
+            evidence=tuple(evidence),
+            metadata={"kind": "specialist_workflow", "dataset_path": str(dataset_path), "question": question or ""},
+        )
+
+    def summarize_specialist_workflow(self, workflow: AgentResult) -> str:
+        """Convert a specialist workflow result into a kernel-owned human-readable summary.
+
+        This keeps the final response layer in the canonical kernel and prevents raw specialist
+        payloads or internal graph envelopes from leaking directly to the user.
+        """
+        if workflow.status != "success":
+            errors = workflow.errors or ("specialist workflow failed",)
+            return f"Specialist workflow did not complete: {errors[0]}"
+
+        output = workflow.output or {}
+        profile = output.get("profile") or {}
+        analysis = output.get("analysis") or {}
+        verification = output.get("verification") or {}
+
+        rows = profile.get("rows") if isinstance(profile, dict) else None
+        columns = profile.get("columns") if isinstance(profile, dict) else None
+        answer = analysis.get("answer") if isinstance(analysis, dict) else None
+        verified = bool(verification.get("verified")) if isinstance(verification, dict) else False
+
+        parts: list[str] = []
+        if rows is not None or columns is not None:
+            parts.append(f"Dataset profile: {rows if rows is not None else '?'} rows, {columns if columns is not None else '?'} columns")
+        if isinstance(answer, dict):
+            if "mean" in answer:
+                parts.append(f"Mean value: {answer['mean']}")
+            elif "rows" in answer:
+                parts.append(f"Count: {answer['rows']} rows")
+            else:
+                key = next((k for k in ("value", "column", "group_by") if k in answer), "summary")
+                value = answer.get(key)
+                parts.append(f"Analysis: {key}={value}")
+        elif answer:
+            parts.append(f"Analysis: {answer}")
+        elif isinstance(analysis, dict) and analysis.get("method"):
+            parts.append(f"Analysis method: {analysis['method']}")
+
+        if verified:
+            parts.append("Verification: passed.")
+        else:
+            parts.append("Verification: not available.")
+
+        return ". ".join(parts) if parts else "Specialist workflow completed successfully."
 
     def _load_beliefs(self, session_id: str) -> list[Belief]:
         """Return a Brain-safe projection supplied by the canonical Memory Controller."""
@@ -82,10 +314,16 @@ class CognitiveKernel:
             predicate, _, value = content.partition(" = ")
             if not predicate or not value:
                 continue
+            metadata = dict(item.metadata or {})
+            revision = metadata.get("revision")
+            supersedes = metadata.get("supersedes_id")
+            if supersedes is None:
+                supersedes = metadata.get("supersedes", "")
             result.append(Belief(
                 subject="user", predicate=predicate, value=value,
                 confidence=float(item.confidence), source="canonical_memory", provenance=item.provenance or "memory-controller",
-                created_at="", updated_at="", revision=1, status="active", supersedes="",
+                created_at="", updated_at="", revision=int(revision) if revision is not None else 1,
+                status="active", supersedes=str(supersedes) if supersedes is not None else "",
             ))
         return result
 
@@ -450,6 +688,43 @@ class CognitiveKernel:
 
     def _run_action(self, state: CognitiveState, action: PlannedAction, outputs: dict[str, Any],
                     approve: Callable[[str, dict[str, Any]], bool]) -> tuple[bool, Any, str | None, bool, float]:
+        if action.tool in {'profile_dataset', 'analyze_dataset'}:
+            try:
+                specialist = self.specialist_registry.resolve('data_analysis')
+            except Exception:
+                specialist = None
+            if specialist is not None:
+                args = self._resolve_action_args(action, outputs)
+                if not approve('data_analysis', args):
+                    return False, None, 'تم رفض العملية التي تحتاج موافقة.', False, 0.0
+                path = str(args.get('path') or args.get('file_path') or args.get('dataset') or '').strip()
+                if not path:
+                    return False, None, 'dataset path is required for data analysis', False, 0.0
+                task_inputs = {'path': path, 'mode': 'profile' if action.tool == 'profile_dataset' else 'analysis'}
+                if action.tool == 'analyze_dataset':
+                    question = args.get('question') or args.get('query')
+                    if question is None:
+                        question = state.goal.objective if state.goal else state.user_text
+                    question = str(question).strip()
+                    if question:
+                        task_inputs['question'] = question
+                task = AgentTask(
+                    task_id=f'{action.step_id}:{uuid.uuid4().hex[:8]}',
+                    objective=str(state.goal.objective if state.goal else state.user_text or 'analyze dataset'),
+                    capability='data_analysis',
+                    inputs=task_inputs,
+                    timeout_seconds=30.0,
+                )
+                result = self.dispatch_specialist_task(task, session_id=state.session_id)
+                if result.status in {'blocked', 'failed', 'needs_input', 'timeout'}:
+                    message = result.errors[0] if result.errors else 'specialist task failed'
+                    state.event('specialist_action_observed', step=action.step_id, tool=action.tool,
+                                ok=False, status=result.status, error=message)
+                    return False, None, message, False, 0.0
+                state.event('specialist_action_observed', step=action.step_id, tool=action.tool,
+                            ok=True, status=result.status, specialist='data-agent')
+                return True, result.output, None, True, 0.0
+
         tool = self.registry.get(action.tool)
         if tool is None:
             return False, None, f'الأداة {action.tool} غير مسجلة.', False, 0.0

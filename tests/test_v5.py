@@ -15,6 +15,32 @@ def test_task_graph_dependencies():
     assert [n.id for n in g.ready()] == ["b"]
 
 
+def test_task_graph_rejects_cycles_and_self_dependencies():
+    cycle = TaskGraph([
+        TaskNode("a", "calculator", {}, ["b"]),
+        TaskNode("b", "save_note", {}, ["a"]),
+    ])
+    cycle_errors = cycle.validate()
+    assert any("cycle:" in e for e in cycle_errors)
+
+    self_loop = TaskGraph([TaskNode("a", "calculator", {}, ["a"])])
+    assert any("self_dependency:a" in e for e in self_loop.validate())
+
+
+def test_task_graph_validates_dependencies_independent_of_order():
+    graph = TaskGraph([
+        TaskNode("step-2", "analyze_dataset", {}, ["step-1"]),
+        TaskNode("step-1", "profile_dataset", {}),
+    ])
+    assert graph.validate() == []
+
+    missing = TaskGraph([
+        TaskNode("step-2", "analyze_dataset", {}, ["missing-step"]),
+        TaskNode("step-1", "profile_dataset", {}),
+    ])
+    assert any("missing_dependency:step-2->missing-step" in e for e in missing.validate())
+
+
 def test_context_requires_evidence():
     g = WorldState(last_goal="احسب 5*3", last_outputs={"last_result": 15})
     assert resolve_goal("استخدم النتيجة", g)[0] == "استخدم 15"

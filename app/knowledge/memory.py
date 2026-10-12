@@ -1835,13 +1835,13 @@ class Memory:
             params += [now,now,now]
         if kind:
             where.append("kind=?"); params.append(kind)
-        sql="SELECT id,kind,key,value,scope,owner_id,source,confidence,importance,status,revision,valid_at,invalid_at,expires_at,updated_at,metadata FROM memory_items WHERE " + " AND ".join(where) + " ORDER BY importance DESC,updated_at DESC,id DESC LIMIT ?"
+        sql="SELECT id,kind,key,value,scope,owner_id,source,confidence,importance,status,revision,supersedes_id,valid_at,invalid_at,expires_at,updated_at,metadata FROM memory_items WHERE " + " AND ".join(where) + " ORDER BY importance DESC,updated_at DESC,id DESC LIMIT ?"
         params.append(max(1,int(limit)))
         rows=self._q(sql,tuple(params)); out=[]
         for r in rows:
             try: md=json.loads(r[-1]) if r[-1] else {}
             except Exception: md={}
-            out.append({"id":r[0],"kind":r[1],"key":r[2],"value":r[3],"scope":r[4],"owner_id":r[5],"source":r[6],"confidence":r[7],"importance":r[8],"status":r[9],"revision":r[10],"valid_at":r[11],"invalid_at":r[12],"expires_at":r[13],"updated_at":r[14],"metadata":md})
+            out.append({"id":r[0],"kind":r[1],"key":r[2],"value":r[3],"scope":r[4],"owner_id":r[5],"source":r[6],"confidence":r[7],"importance":r[8],"status":r[9],"revision":r[10],"supersedes_id":r[11],"valid_at":r[12],"invalid_at":r[13],"expires_at":r[14],"updated_at":r[15],"metadata":md})
         return out
 
     def get_memory(self, memory_id: int, *, include_inactive: bool = False, scope: str | None = None, owner_id: str | None = None, session_id: str | None = None, run_id: str | None = None) -> dict | None:

@@ -7,6 +7,7 @@ from app.brain.self_model import SelfModel
 from app.brain.store import BrainStateStore
 from app.brain.perception import perceive
 from app.knowledge.memory import Memory
+from app.runtime.cognitive_agent import run_structured_cognitive
 from app.runtime.registry import Tool
 
 
@@ -94,6 +95,20 @@ def test_belief_revision_preserves_history_event(tmp_path: Path):
     assert beliefs[0].revision == 2
     events = brain.state_store.recent_events('s1', limit=20)
     assert any(e['kind'] == 'belief_revision' and e['payload']['previous_value'] == 'أزرق' for e in events)
+
+
+def test_run_structured_cognitive_defaults_to_deny_approval():
+    encountered = {}
+
+    class DummyKernel:
+        def act_structured(self, payload, *, approve=None, session_id=None, max_steps=10):
+            encountered['approve'] = approve
+            return type('Result', (), {'status': 'completed', 'response': 'ok', 'runtime_state': {}, 'state': object()})()
+
+    result = run_structured_cognitive({'goal': 'demo'}, kernel=DummyKernel())
+    assert result.status == 'completed'
+    assert encountered['approve'] is not None
+    assert encountered['approve']('remember_fact', {'key': 'x', 'value': 'y'}) is False
 
 
 def test_procedure_family_is_induced_from_verified_multi_step_experience(tmp_path: Path):

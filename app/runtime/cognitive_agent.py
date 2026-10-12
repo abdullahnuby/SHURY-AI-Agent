@@ -190,7 +190,7 @@ def _persist_brain_world_result(result: BrainResult, memory: Any, session_id: st
 
 def run_cognitive(
     goal: str,
-    approve=lambda t, a: True,
+    approve=lambda *_args, **_kwargs: False,
     max_steps: int = 10,
     max_seconds: float = 180.0,
     max_bad_replies: int = 3,
@@ -250,7 +250,7 @@ def run_cognitive(
 def run_structured_cognitive(
     payload: dict,
     *,
-    approve=lambda t, a: True,
+    approve=lambda *_args, **_kwargs: False,
     max_steps: int = 10,
     session_id: str | None = None,
     kernel: CognitiveKernel | None = None,

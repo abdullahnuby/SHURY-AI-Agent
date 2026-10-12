@@ -143,6 +143,8 @@ class MemoryController:
                     metadata={
                         "importance": row.get("importance"),
                         "revision": row.get("revision"),
+                        "supersedes_id": row.get("supersedes_id"),
+                        "supersedes": row.get("supersedes_id"),
                         "status": row.get("status"),
                     },
                 )
