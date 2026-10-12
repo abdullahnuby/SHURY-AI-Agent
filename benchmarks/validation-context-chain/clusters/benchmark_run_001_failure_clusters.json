@@ -1,0 +1,17 @@
+{
+  "reference_resolution": [],
+  "memory_update": [],
+  "mixed_language": [
+    {
+      "conversation_id": "dialogue-1-0001",
+      "category": "social",
+      "turn": 2,
+      "user_message": "أهلا يا شوري",
+      "expected_tool": "greeting",
+      "actual_tools": [],
+      "status": "needs_user",
+      "language": "mixed"
+    }
+  ],
+  "tool_routing": []
+}

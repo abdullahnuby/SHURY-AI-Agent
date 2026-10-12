@@ -1,0 +1,78 @@
+{
+  "round1": {
+    "count": 1000,
+    "unique_ids": 1000,
+    "unique_transcripts": 624,
+    "categories": {
+      "memory": 252,
+      "task": 84,
+      "reference": 83,
+      "research": 83,
+      "analysis": 83,
+      "clarification": 83,
+      "bilingual": 83,
+      "topic_switch": 83,
+      "correction": 83,
+      "tool_task": 83
+    },
+    "language_modes": {
+      "ar": 193,
+      "ar_to_en": 183,
+      "en_to_ar": 174,
+      "mixed": 229,
+      "en": 221
+    },
+    "true_dimensions": {
+      "correction": 167,
+      "noise": 327,
+      "topic_switch": 277,
+      "typo": 113
+    }
+  },
+  "round2": {
+    "count": 1000,
+    "unique_ids": 1000,
+    "unique_transcripts": 767,
+    "categories": {
+      "memory": 252,
+      "task": 84,
+      "reference": 83,
+      "research": 83,
+      "analysis": 83,
+      "clarification": 83,
+      "bilingual": 83,
+      "topic_switch": 83,
+      "correction": 83,
+      "tool_task": 83
+    },
+    "language_modes": {
+      "ar": 185,
+      "mixed": 268,
+      "en": 201,
+      "ar_to_en": 167,
+      "en_to_ar": 179
+    },
+    "true_dimensions": {
+      "round2_new_wording": 1000,
+      "noise": 313,
+      "correction": 167,
+      "round2_new_topics": 415,
+      "round2_new_references": 415,
+      "topic_switch": 248,
+      "typo": 117
+    }
+  },
+  "overlap": {
+    "conversation_ids": 0,
+    "exact_transcripts": 0
+  },
+  "new_seed": [
+    20261017
+  ],
+  "round1_seed": [
+    20261002
+  ],
+  "comparable": true,
+  "unique_transcript_diversity_gain_percent": 22.92,
+  "runtime_comparison": "unavailable_due_required_real_model_blocker"
+}

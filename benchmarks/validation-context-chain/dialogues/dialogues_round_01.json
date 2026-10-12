@@ -1,0 +1,97 @@
+[
+  {
+    "id": "dialogue-1-0000",
+    "seed": 1,
+    "category": "personal_memory",
+    "language": "english",
+    "turns": [
+      "my name is Abdullah",
+      "I am from Luxor",
+      "what is my name?",
+      "where am I from?",
+      "do you remember my name?"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "name",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "remember_fact",
+        "expected_status": "completed",
+        "expected_key": "result",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 5,
+        "expected_tool": "recall_fact",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 5,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "english"
+    }
+  },
+  {
+    "id": "dialogue-1-0001",
+    "seed": 1,
+    "category": "social",
+    "language": "mixed",
+    "turns": [
+      "hello",
+      "أهلا يا شوري",
+      "how are you?",
+      "شكرا"
+    ],
+    "expected": [
+      {
+        "turn": 1,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 2,
+        "expected_tool": "greeting",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 3,
+        "expected_tool": "how_are_you",
+        "expected_status": "completed",
+        "requires_clarification": false
+      },
+      {
+        "turn": 4,
+        "expected_tool": "thanks",
+        "expected_status": "completed",
+        "requires_clarification": false
+      }
+    ],
+    "metadata": {
+      "turn_count": 4,
+      "superset": "stateful-conversation-agent",
+      "language_mix": "ar-en"
+    }
+  }
+]

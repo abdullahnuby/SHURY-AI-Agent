@@ -1,0 +1,1562 @@
+[
+  {
+    "id": "core.001",
+    "category": "core",
+    "goal": "calculate 4*6",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.002",
+    "category": "core",
+    "goal": "calculate 17*6",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.003",
+    "category": "core",
+    "goal": "calculate 2+3*4",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.004",
+    "category": "core",
+    "goal": "احسب 25/5",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.005",
+    "category": "core",
+    "goal": "what is 12 times 7",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.006",
+    "category": "core",
+    "goal": "calculate -8+3",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.007",
+    "category": "core",
+    "goal": "calculate 2^5",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.008",
+    "category": "core",
+    "goal": "calculate 10%3",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.009",
+    "category": "core",
+    "goal": "subtract 9 from 20",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.010",
+    "category": "core",
+    "goal": "divide 81 by 9",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.011",
+    "category": "core",
+    "goal": "calculate (5+3)*2",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "calculator"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.012",
+    "category": "core",
+    "goal": "hello",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.013",
+    "category": "core",
+    "goal": "hi there",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.014",
+    "category": "core",
+    "goal": "good morning",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "core.015",
+    "category": "core",
+    "goal": "what time is it?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "get_time"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.016",
+    "category": "memory",
+    "goal": "my name is Abdullah",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "remember_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.017",
+    "category": "memory",
+    "goal": "what is my name?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "recall_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.018",
+    "category": "memory",
+    "goal": "I'm from Luxor",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "remember_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.019",
+    "category": "memory",
+    "goal": "where do I come from?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "recall_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.020",
+    "category": "memory",
+    "goal": "I prefer dark mode",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "remember_memory"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.021",
+    "category": "memory",
+    "goal": "what programming language do I prefer?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "recall_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.022",
+    "category": "memory",
+    "goal": "remember that my favorite editor is VS Code",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "remember_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.023",
+    "category": "memory",
+    "goal": "do you remember my name?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "recall_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.024",
+    "category": "memory",
+    "goal": "forget my name",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "forget_fact"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.025",
+    "category": "memory",
+    "goal": "what do you remember about me?",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_profile"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.026",
+    "category": "memory",
+    "goal": "search my memory Abdullah",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "search_memory"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.027",
+    "category": "memory",
+    "goal": "save a note: kickoff is Monday",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "save_note"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.028",
+    "category": "memory",
+    "goal": "show my notes",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "list_notes"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.029",
+    "category": "memory",
+    "goal": "search my notes kickoff",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "search_notes"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.030",
+    "category": "memory",
+    "goal": "memory health",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_health"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.031",
+    "category": "memory",
+    "goal": "memory stats",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_stats"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.032",
+    "category": "memory",
+    "goal": "memory history name",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_history"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.033",
+    "category": "memory",
+    "goal": "memory graph Abdullah",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_graph"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.034",
+    "category": "memory",
+    "goal": "memory cleanup",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_cleanup"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "memory.035",
+    "category": "memory",
+    "goal": "forget everything about me",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "memory_forget_all"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "cancelled",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "journey.036",
+    "category": "journey",
+    "goal": "my name is Abdullah",
+    "mode": "sequence",
+    "turns": [
+      "my name is Abdullah",
+      "what is my name?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "name"
+  },
+  {
+    "id": "journey.037",
+    "category": "journey",
+    "goal": "I'm from Luxor",
+    "mode": "sequence",
+    "turns": [
+      "I'm from Luxor",
+      "where do I come from?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "origin"
+  },
+  {
+    "id": "journey.038",
+    "category": "journey",
+    "goal": "calculate 9*9",
+    "mode": "sequence",
+    "turns": [
+      "calculate 9*9",
+      "what was the last result?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "journey.039",
+    "category": "journey",
+    "goal": "calculate 9*9",
+    "mode": "sequence",
+    "turns": [
+      "calculate 9*9",
+      "save the result as total",
+      "what is total?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "result81"
+  },
+  {
+    "id": "journey.040",
+    "category": "journey",
+    "goal": "my city is Cairo",
+    "mode": "sequence",
+    "turns": [
+      "my city is Cairo",
+      "No, I mean Luxor",
+      "what is my city?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "city"
+  },
+  {
+    "id": "journey.041",
+    "category": "journey",
+    "goal": "my city is Cairo",
+    "mode": "sequence",
+    "turns": [
+      "my city is Cairo",
+      "forget my city",
+      "what is my city?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "no_city"
+  },
+  {
+    "id": "journey.042",
+    "category": "journey",
+    "goal": "my name is Abdullah",
+    "mode": "sequence",
+    "turns": [
+      "my name is Abdullah",
+      "I'm from Luxor",
+      "what do you remember about me?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "profile_two"
+  },
+  {
+    "id": "journey.043",
+    "category": "journey",
+    "goal": "what is my name?",
+    "mode": "sequence",
+    "turns": [
+      "what is my name?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": "isolation"
+  },
+  {
+    "id": "journey.044",
+    "category": "journey",
+    "goal": "I prefer dark mode",
+    "mode": "sequence",
+    "turns": [
+      "I prefer dark mode",
+      "what do I prefer?"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "journey.045",
+    "category": "journey",
+    "goal": "save a note: alpha",
+    "mode": "sequence",
+    "turns": [
+      "save a note: alpha",
+      "search my notes alpha"
+    ],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "needs_user"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.048",
+    "category": "rag",
+    "goal": "index corpus knowledge.txt",
+    "mode": "sequence",
+    "turns": [
+      "index corpus knowledge.txt",
+      "answer using the indexed documents about agent memory"
+    ],
+    "required_tools": [
+      "index_knowledge",
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.046",
+    "category": "rag",
+    "goal": "index corpus knowledge.txt",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "index_knowledge"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.047",
+    "category": "rag",
+    "goal": "rag agent memory provenance",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.049",
+    "category": "rag",
+    "goal": "rag world state transitions",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.050",
+    "category": "rag",
+    "goal": "index agent memory",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "index_agent_memory"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.051",
+    "category": "rag",
+    "goal": "rag provenance and temporal memory",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.052",
+    "category": "rag",
+    "goal": "rag retrieval",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.053",
+    "category": "rag",
+    "goal": "retrieve evidence from agent memory about my name",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.054",
+    "category": "rag",
+    "goal": "rag world models",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "rag_query"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "rag.055",
+    "category": "rag",
+    "goal": "rag portfolio",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_rag_portfolio"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.056",
+    "category": "data",
+    "goal": "profile dataset sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "profile_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.057",
+    "category": "data",
+    "goal": "analyze sales.csv for outliers",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.058",
+    "category": "data",
+    "goal": "analyze the dataset sales.csv and find anomalies",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.059",
+    "category": "data",
+    "goal": "find outliers in sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.060",
+    "category": "data",
+    "goal": "what is the average value in sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.061",
+    "category": "data",
+    "goal": "find correlation in sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.062",
+    "category": "data",
+    "goal": "profile the data in sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "profile_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.063",
+    "category": "data",
+    "goal": "analyze data file sales.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.064",
+    "category": "data",
+    "goal": "profile dataset bad.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "profile_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "data.065",
+    "category": "data",
+    "goal": "analyze bad.csv",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "analyze_dataset"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.066",
+    "category": "workspace",
+    "goal": "list the files",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.067",
+    "category": "workspace",
+    "goal": "read hello.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.068",
+    "category": "workspace",
+    "goal": "find ERROR in log.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.069",
+    "category": "workspace",
+    "goal": "write output.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": "wrote"
+  },
+  {
+    "id": "workspace.070",
+    "category": "workspace",
+    "goal": "write outside",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": "no_escape"
+  },
+  {
+    "id": "workspace.071",
+    "category": "workspace",
+    "goal": "read missing.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.072",
+    "category": "workspace",
+    "goal": "read ../secret.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": "no_escape"
+  },
+  {
+    "id": "workspace.073",
+    "category": "workspace",
+    "goal": "replace config.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.074",
+    "category": "workspace",
+    "goal": "read utf8.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.075",
+    "category": "workspace",
+    "goal": "read big.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.076",
+    "category": "workspace",
+    "goal": "search ERROR in nested/app.log",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.077",
+    "category": "workspace",
+    "goal": "write nested/new.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.078",
+    "category": "workspace",
+    "goal": "write output.txt but deny approval",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "cancelled"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "workspace.079",
+    "category": "workspace",
+    "goal": "read via absolute traversal",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": "no_escape"
+  },
+  {
+    "id": "workspace.080",
+    "category": "workspace",
+    "goal": "search text with empty query",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.081",
+    "category": "development",
+    "goal": "inspect the project",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "inspect_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.082",
+    "category": "development",
+    "goal": "check the project",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.083",
+    "category": "development",
+    "goal": "run the project tests",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.084",
+    "category": "development",
+    "goal": "run the project tests",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.085",
+    "category": "development",
+    "goal": "inspect the repository",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "inspect_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.086",
+    "category": "development",
+    "goal": "check project compile",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.087",
+    "category": "development",
+    "goal": "inspect the project stack",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "inspect_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.088",
+    "category": "development",
+    "goal": "check the project with no manifest",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.089",
+    "category": "development",
+    "goal": "inspect the project before editing it",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "inspect_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "dev.090",
+    "category": "development",
+    "goal": "run project tests",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "check_project"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.091",
+    "category": "research_skills",
+    "goal": "search the web for latest agent memory research",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "web_research"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.092",
+    "category": "research_skills",
+    "goal": "find recent academic papers about agent memory",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "arxiv_research"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.093",
+    "category": "research_skills",
+    "goal": "search github repositories for agentic rag",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "github_search"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.094",
+    "category": "research_skills",
+    "goal": "research and learn about agent memory",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "research_and_learn"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.095",
+    "category": "research_skills",
+    "goal": "list skills",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "list_skills"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.096",
+    "category": "research_skills",
+    "goal": "match skills for data analysis",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "match_skills"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.097",
+    "category": "research_skills",
+    "goal": "discover skills for this task",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "discover_skills"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.098",
+    "category": "research_skills",
+    "goal": "research status",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "research_status"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "world.099",
+    "category": "world",
+    "goal": "predict what will happen if I write output.txt",
+    "mode": "react",
+    "turns": [],
+    "required_tools": [
+      "simulate_action"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed"
+    ],
+    "postcheck": ""
+  },
+  {
+    "id": "researchskills.100",
+    "category": "research_skills",
+    "goal": "network status",
+    "mode": "agent",
+    "turns": [],
+    "required_tools": [
+      "network_status"
+    ],
+    "forbidden_tools": [],
+    "expected_status": [
+      "completed",
+      "failed"
+    ],
+    "postcheck": ""
+  }
+]

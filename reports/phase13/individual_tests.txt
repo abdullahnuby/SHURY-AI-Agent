@@ -1,0 +1,82 @@
+=== tests/test_chat_ui_regressions.py::test_natural_memory_question_retrieves_note ===
+.                                                                        [100%]
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_chat_ui_regressions.py::test_natural_memory_question_retrieves_note
+1 passed in 9.18s
+EXIT:0
+=== tests/test_chat_ui_regressions.py::test_serialized_brain_exposes_compact_decision_evidence ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_serialized_brain_exposes_compact_decision_evidence ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-185/test_serialized_brain_exposes_0')
+
+    def test_serialized_brain_exposes_compact_decision_evidence(tmp_path: Path):
+        from app.api import run_brain
+        from app.brain.kernel import CognitiveKernel
+        from app.brain.store import BrainStateStore
+        from app.knowledge.memory import Memory
+        from app.learning.store import LearningStore
+        from app.runtime.registry import Tool
+    
+        registry = {
+            'research_memory_search': Tool(
+                'research_memory_search', 'local research evidence', {'query': 'str'},
+                lambda query: {'evidence': [{'title': 'local evidence', 'snippet': query}]},
+                capability='research_memory_retrieval', produces=('historical_research_evidence',),
+                cost=0.6, duration=0.05, risk='low', idempotent=True,
+                verification_level='strong', exploration_safe=True, emits_world_delta=False,
+                information_domains=('research', 'learning', 'memory'), information_gain_prior=0.92,
+                build_args=lambda goal: {'query': str(goal)},
+            ),
+            'research_and_learn': Tool(
+                'research_and_learn', 'learn locally in test', {'query': 'str'},
+                lambda query: {
+                    'query': query, 'evidence_count': 1, 'new_evidence_count': 1,
+                    'route': [{'source': 'test'}],
+                    'evidence': [{'title': 'learned evidence', 'url': 'https://example.test', 'snippet': query}],
+                },
+                capability='open_world_learning', produces=('research_evidence', 'learning_candidate'),
+                cost=1.0, duration=0.05, risk='low', idempotent=True,
+                verification_level='strong', exploration_safe=True, emits_world_delta=False,
+                information_domains=('research', 'learning'), information_gain_prior=0.95,
+                match=lambda _goal: False,
+                build_args=lambda goal: {'query': str(goal)},
+            ),
+        }
+        result = run_brain(
+            'learn how to improve',
+            session_id='ui-cognition',
+            kernel=CognitiveKernel(
+                memory=Memory(tmp_path / 'memory.db'),
+                registry=registry,
+                state_store=BrainStateStore(tmp_path / 'brain_state.db'),
+                experience_store=LearningStore(tmp_path / 'learning.db'),
+            ),
+        )
+        from app.interfaces.web.server import serialize_state
+        payload = serialize_state(result)
+        summary = payload['cognitive']['summary']
+>       assert summary['decision'] == 'research'
+E       AssertionError: assert 'clarify' == 'research'
+E         
+E         - research
+E         + clarify
+
+tests/test_chat_ui_regressions.py:101: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_chat_ui_regressions.py::test_serialized_brain_exposes_compact_decision_evidence - AssertionError: assert 'clarify' == 'research'
+  
+  - research
+  + clarify
+1 failed in 8.37s
+EXIT:1
+=== tests/test_memory_v22_full.py::test_explicit_human_correction_reuses_previous_assignment_key ===
+.                                                                        [100%]
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_memory_v22_full.py::test_explicit_human_correction_reuses_previous_assignment_key
+1 passed in 9.85s
+EXIT:0
+=== tests/test_memory_v22_full.py::test_forget_my_generic_key_uses_same_canonical_key ===

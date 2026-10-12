@@ -1,0 +1,24 @@
+{
+  "schema_version": "shury.dialogue.v1",
+  "generator_version": "phase19-adversarial-generator.v1",
+  "round": 4,
+  "seed": 20261019,
+  "count": 500,
+  "focus": [
+    "ambiguous_references",
+    "long_context",
+    "contradictory_information",
+    "rapid_topic_switching",
+    "language_switching",
+    "typos",
+    "memory_conflicts",
+    "tool_failures",
+    "rag_failures",
+    "web_failures",
+    "unsafe_requests",
+    "prompt_injection",
+    "untrusted_content"
+  ],
+  "deterministic": true,
+  "output": "/mnt/data/phase19_work/project/project/benchmarks/dialogues/phase19/dialogues_phase19_seed_20261019.jsonl"
+}

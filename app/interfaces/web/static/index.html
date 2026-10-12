@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SHURY — Personal AI Agent</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">س</div>
+        <div>
+          <div class="brand-name" id="agent-name">SHURY</div>
+          <div class="brand-sub">Personal AI Agent</div>
+        </div>
+      </div>
+      <section class="identity-card">
+        <div class="eyebrow">IDENTITY</div>
+        <h2 id="agent-role">Reasoning &amp; execution partner</h2>
+        <p id="agent-mission"></p>
+        <div class="mini-label">Background</div>
+        <div id="agent-background" class="identity-list"></div>
+      </section>
+      <section class="identity-card">
+        <div class="eyebrow">MIND</div>
+        <div id="agent-principles" class="identity-list"></div>
+      </section>
+      <section class="status-card">
+        <div class="status-row"><span>Brain</span><strong id="brain-status">checking…</strong></div>
+        <div class="status-row"><span>Memory</span><strong>Persistent</strong></div>
+        <div class="status-row"><span>Seed</span><strong>100K scenarios</strong></div>
+      </section>
+      <button class="new-chat" id="new-chat">+ New conversation</button>
+      <div class="sidebar-footer">Local-first interface · governed execution</div>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div>
+          <div class="eyebrow">SHURY</div>
+          <h1>Talk to your agent</h1>
+          <p id="session-label">State · evidence · prediction · exploration · learning</p>
+        </div>
+        <div class="header-pill"><span class="pulse"></span><span id="brain-mode">Learning brain</span></div>
+      </header>
+
+      <section class="messages" id="messages" aria-live="polite"></section>
+
+      <section class="approval hidden" id="approval">
+        <div class="approval-title">Approval required</div>
+        <div class="approval-text" id="approval-text"></div>
+        <div class="approval-actions">
+          <button class="secondary" id="deny">Deny</button>
+          <button class="primary" id="approve">Approve</button>
+        </div>
+      </section>
+
+      <form class="composer" id="composer">
+        <textarea id="input" rows="2" placeholder="Talk naturally… / اسأل شوري عن أي شيء"></textarea>
+        <button class="send" id="send" type="submit" aria-label="Send">➜</button>
+      </form>
+      <div class="composer-hint">SHURY observes, predicts, explores safely, learns from outcomes, and executes only governed actions.</div>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

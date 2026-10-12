@@ -1,0 +1,12 @@
+app/api.py
+app/brain/kernel.py
+app/brain/structured.py
+app/interfaces/web/server.py
+app/runtime/cognitive_agent.py
+tests/test_phase9_llm_independent_execution.py
+tests/test_web_interface.py
+docs/SHURY_PHASE9_RESULT.md
+docs/PHASE9_TASK_BREAKDOWN.md
+PHASE9_MODIFIED_PATHS.txt
+CHANGELOG.md
+CHANGELOG_LEARNING_INTEGRATION.md

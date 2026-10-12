@@ -1,0 +1,132 @@
+{
+  "phase": 13,
+  "mode": "failure_collection_only",
+  "source_limitations": {
+    "real_phase12_1000_runtime": {
+      "requested": 1000,
+      "executed": 0,
+      "reason": "Arabic-Retrieval-v1.0 production dependency/model unavailable"
+    },
+    "therefore": "No failure is labeled as a Phase-12 real-1000-runtime failure. Current clusters below come from executable tests and targeted live/isolated checks available in the Phase-12 project snapshot, plus explicitly separated historical evidence."
+  },
+  "current_open_failures": [
+    {
+      "id": "F13-CK-001",
+      "test": "tests/test_cognitive_kernel.py::test_identity_is_answered_from_memory",
+      "observed": "decision.answer_source='beliefs'",
+      "expected": "decision.answer_source='memory'",
+      "primary_category": "Memory",
+      "secondary_categories": ["Context"]
+    },
+    {
+      "id": "F13-CK-002",
+      "test": "tests/test_cognitive_kernel.py::test_memory_question_is_semantically_reduced",
+      "observed": "no state memory item was emitted",
+      "expected": "at least one state memory item",
+      "primary_category": "Memory",
+      "secondary_categories": ["Response"]
+    },
+    {
+      "id": "F13-CK-003",
+      "test": "tests/test_cognitive_kernel.py::test_greeting_does_not_research",
+      "observed": "decision.kind='research'",
+      "expected": "decision.kind='respond'",
+      "primary_category": "Social",
+      "secondary_categories": ["Intent", "Planning"]
+    },
+    {
+      "id": "F13-CK-004",
+      "test": "tests/test_cognitive_kernel.py::test_generic_question_requests_evidence",
+      "observed": "decision.kind='clarify'",
+      "expected": "decision.kind='research'",
+      "primary_category": "Research",
+      "secondary_categories": ["Planning", "Intent"]
+    },
+    {
+      "id": "F13-CK-005",
+      "test": "tests/test_cognitive_kernel.py::test_calculation_is_actionable",
+      "observed": "decision.kind='clarify'",
+      "expected": "decision.kind='execute'",
+      "primary_category": "Planning",
+      "secondary_categories": ["Intent", "Tool routing"]
+    },
+    {
+      "id": "F13-LI-001",
+      "test": "tests/test_learning_integration.py::test_kernel_execution_closes_phases_2_to_7_loop",
+      "observed": "no learning_recorded trace event",
+      "expected": "learning_recorded event with transition_count=1",
+      "primary_category": "Verification",
+      "secondary_categories": ["Runtime"]
+    },
+    {
+      "id": "F13-LI-002",
+      "test": "tests/test_learning_integration.py::test_run_brain_uses_injected_kernel_and_learning_path",
+      "observed": "no persisted learning experience for run_id",
+      "expected": "experience persisted",
+      "primary_category": "Verification",
+      "secondary_categories": ["Runtime"]
+    },
+    {
+      "id": "F13-CUI-001",
+      "test": "tests/test_chat_ui_regressions.py::test_serialized_brain_exposes_compact_decision_evidence",
+      "observed": "summary.decision='clarify'",
+      "expected": "summary.decision='research'",
+      "primary_category": "Research",
+      "secondary_categories": ["Planning", "Response"]
+    }
+  ],
+  "process_and_environment_failures": [
+    {
+      "id": "F13-RUN-001",
+      "source": "tests/test_chat_ui_regressions.py",
+      "observed": "full-file pytest process exceeded timeout",
+      "category": "Runtime"
+    },
+    {
+      "id": "F13-RUN-002",
+      "source": "tests/test_memory_v22_full.py combined execution",
+      "observed": "full-file pytest process exceeded timeout before complete aggregate result",
+      "category": "Runtime"
+    },
+    {
+      "id": "F13-RUN-003",
+      "source": "Phase 12 production preflight",
+      "observed": "Arabic-Retrieval-v1.0 cannot load because sentence_transformers/transformers are unavailable and no model cache exists",
+      "category": "Runtime"
+    }
+  ],
+  "current_primary_cluster_counts": {
+    "Social": 1,
+    "Intent": 0,
+    "Entity": 0,
+    "Slot": 0,
+    "Reference": 0,
+    "Memory": 2,
+    "Context": 0,
+    "Planning": 1,
+    "Tool routing": 0,
+    "Tool execution": 0,
+    "Verification": 2,
+    "RAG": 0,
+    "Research": 2,
+    "Security": 0,
+    "Response": 0,
+    "Runtime": 3
+  },
+  "secondary_overlap": {
+    "Intent": 3,
+    "Planning": 3,
+    "Context": 1,
+    "Response": 2,
+    "Tool routing": 1
+  },
+  "historical_resolved_clusters": {
+    "Semantic/slot": 1,
+    "Reference": 2,
+    "Memory": 5,
+    "Bilingual": 6,
+    "Response boundary": 1,
+    "Generator/benchmark harness": 1
+  },
+  "fix_status": "No Phase 13 fixes applied"
+}

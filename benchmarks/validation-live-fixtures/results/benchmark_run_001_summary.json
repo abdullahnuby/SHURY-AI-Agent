@@ -1,0 +1,69 @@
+{
+  "dialogs": 10,
+  "turns_total": 49,
+  "pass_count": 34,
+  "evaluated_turns": 49,
+  "fail_count": 15,
+  "pass_rate": 69.39,
+  "categories": {
+    "ambiguous": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 100.0
+    },
+    "context_reference": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 0.0
+    },
+    "data_analysis": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 80.0
+    },
+    "long_horizon_mixed": {
+      "count": 1,
+      "turns": 8,
+      "pass_rate": 75.0
+    },
+    "memory_recall": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 100.0
+    },
+    "multi_step": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 80.0
+    },
+    "personal_memory": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 100.0
+    },
+    "research": {
+      "count": 1,
+      "turns": 5,
+      "pass_rate": 20.0
+    },
+    "social": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 75.0
+    },
+    "task_execution": {
+      "count": 1,
+      "turns": 4,
+      "pass_rate": 50.0
+    }
+  },
+  "metrics": {
+    "tool_routing_accuracy": 73.47,
+    "status_accuracy": 75.51,
+    "reference_resolution": null,
+    "memory_correctness": null,
+    "conversation_success": 30.0,
+    "false_execution": null,
+    "hallucinated_memory": null
+  }
+}

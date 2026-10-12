@@ -1,0 +1,14 @@
+{
+  "schema_version": "shury.dialogue.v1",
+  "generator_version": "phase17-dialogue-generator.v1",
+  "round": 2,
+  "seed": 20261017,
+  "count": 1000,
+  "output": "benchmarks/dialogues/round2/dialogues_round_02_seed_20261017.jsonl",
+  "source_round1_seed": 20261002,
+  "new_wording": true,
+  "new_topics": true,
+  "new_language_switches": true,
+  "new_references": true,
+  "deterministic": true
+}

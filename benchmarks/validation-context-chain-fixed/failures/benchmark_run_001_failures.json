@@ -1,0 +1,14 @@
+[
+  {
+    "conversation_id": "dialogue-1-0000",
+    "category": "data_analysis",
+    "turn": 4,
+    "user_message": "حلل ملف sales.csv وحدد السجلات التي ينبغي فحصها بعد ذلك",
+    "expected_tool": "data_analysis",
+    "actual_tools": [
+      "analyze_dataset"
+    ],
+    "status": "needs_user",
+    "language": "arabic"
+  }
+]

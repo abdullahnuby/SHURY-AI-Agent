@@ -1,0 +1,26 @@
+{
+  "phase": 14,
+  "mode": "root_cause_analysis_only",
+  "gate": "PASS",
+  "production_source_changes": 0,
+  "test_changes": 0,
+  "major_clusters": 9,
+  "all_major_clusters_have_root_cause": true,
+  "clusters": [
+    "RC-MEM-01",
+    "RC-MEM-02",
+    "RC-SOC-01",
+    "RC-RES-01",
+    "RC-RES-02",
+    "RC-PLAN-01",
+    "RC-VER-01",
+    "RC-RUN-01",
+    "RC-ENV-01"
+  ],
+  "phase_15_started": false,
+  "notes": [
+    "RC-RUN-01 is a test orchestration/execution-window constraint; isolated runs terminate normally.",
+    "RC-ENV-01 remains the Phase 12 production blocker for Arabic-Retrieval-v1.0.",
+    "No fixes were applied during Phase 14."
+  ]
+}

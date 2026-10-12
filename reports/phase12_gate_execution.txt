@@ -1,0 +1,8 @@
+PHASE 12 FULL GATE INVOCATION
+command: PYTHONPATH=. SHURY_NLP_MODE=required python scripts/run_real_dialogues.py --limit 1000 --output reports/phase12_gate_execution
+exit_code: 2
+status: BLOCKED_BY_ENVIRONMENT
+requested_sessions: 1000
+executed_sessions: 0
+model: omarelshehy/Arabic-Retrieval-v1.0
+model_error: RuntimeError: Arabic retrieval model unavailable: ModuleNotFoundError: No module named 'sentence_transformers'

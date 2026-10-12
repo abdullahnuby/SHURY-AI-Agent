@@ -1,0 +1,80 @@
+F.....FF................................                                 [100%]
+=================================== FAILURES ===================================
+_________ test_unified_contract_has_typed_core_fields_across_languages _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f46f172efd0>
+
+    def test_unified_contract_has_typed_core_fields_across_languages(monkeypatch):
+        monkeypatch.setenv("SHURY_NLP_MODE", "off")
+        parses = [
+            semantic_understand("احسب 20*5"),
+            semantic_understand("calculate 20*5"),
+            semantic_understand("احسب 20*5 please"),
+        ]
+        contracts = [SemanticContract.from_parse(item) for item in parses]
+    
+        assert contracts[0].language == "ar"
+        assert contracts[1].language == "en"
+        assert contracts[2].language == "mixed"
+        assert {item.intent for item in contracts} == {"calculate"}
+        assert {item.operation for item in contracts} == {"calculate"}
+>       assert {item.expression for item in contracts} == {"20*5"}
+E       AssertionError: assert {'20*5', '20*5 please'} == {'20*5'}
+E         
+E         Extra items in the left set:
+E         '20*5 please'
+E         
+E         Full diff:
+E           {
+E               '20*5',
+E         +     '20*5 please',
+E           }
+
+tests/test_semantic_contract.py:20: AssertionError
+________________ test_deictic_skill_request_uses_previous_goal _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_deictic_skill_request_use0')
+
+    def test_deictic_skill_request_uses_previous_goal(tmp_path: Path):
+        brain = kernel(tmp_path)
+        brain.think('راجع المشروع وشغل الاختبارات', session_id='s1')
+        frame = brain.perceive('اكتشف المهارات المناسبة للمهمة دي', session_id='s1').semantic
+        assert frame.requested_operation == 'skill_query'
+>       assert frame.slot('reference_target') == 'راجع المشروع وشغل الاختبارات'
+E       AssertionError: assert '' == 'راجع المشروع وشغل الاختبارات'
+E         
+E         - راجع المشروع وشغل الاختبارات
+
+tests/test_v23_semantic_transfer.py:31: AssertionError
+____________ test_deictic_reference_without_context_is_not_executed ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-35/test_deictic_reference_without0')
+
+    def test_deictic_reference_without_context_is_not_executed(tmp_path: Path):
+        result = kernel(tmp_path).think('اكتشف المهارات المناسبة للمهمة دي', session_id='empty')
+>       assert result.state.decision.kind == 'clarify'
+E       AssertionError: assert 'execute' == 'clarify'
+E         
+E         - clarify
+E         + execute
+
+tests/test_v23_semantic_transfer.py:37: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_semantic_contract.py::test_unified_contract_has_typed_core_fields_across_languages - AssertionError: assert {'20*5', '20*5 please'} == {'20*5'}
+  
+  Extra items in the left set:
+  '20*5 please'
+  
+  Full diff:
+    {
+        '20*5',
+  +     '20*5 please',
+    }
+FAILED tests/test_v23_semantic_transfer.py::test_deictic_skill_request_uses_previous_goal - AssertionError: assert '' == 'راجع المشروع وشغل الاختبارات'
+  
+  - راجع المشروع وشغل الاختبارات
+FAILED tests/test_v23_semantic_transfer.py::test_deictic_reference_without_context_is_not_executed - AssertionError: assert 'execute' == 'clarify'
+  
+  - clarify
+  + execute
+3 failed, 37 passed in 16.86s

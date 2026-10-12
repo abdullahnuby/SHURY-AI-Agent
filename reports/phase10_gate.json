@@ -1,0 +1,25 @@
+{
+  "phase": 10,
+  "gate": "PASS",
+  "seed": 20261002,
+  "corpus": {
+    "count": 1000,
+    "unique_conversation_ids": 1000,
+    "unique_session_seeds": 1000,
+    "total_turns": 3216,
+    "min_turns": 3,
+    "max_turns": 5,
+    "unique_transcripts": 624,
+    "duplicate_transcripts": 376,
+    "jsonl_sha256": "91d6a04e2eba4e49a2ba1d04e451c1158fa1f15dad2a81792b12815b35a7f7b5",
+    "path": "benchmarks/dialogues/dialogues_phase10_seed_20261002.jsonl"
+  },
+  "tests": {
+    "phase10_generator": "6/6",
+    "stateful_generator_compatibility": "2/2",
+    "compileall": "PASS"
+  },
+  "notes": [
+    "The older Phase 9 bilingual regression process stopped responding after seven reported passing tests; this process-level issue is recorded separately and is not a Phase 10 generator gate criterion."
+  ]
+}

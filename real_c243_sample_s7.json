@@ -1,0 +1,132 @@
+{
+  "label": "c243-sample",
+  "seed": 7,
+  "tasks_hash": "b8e32a1c7cffcb6a",
+  "data_dir": "D:\\PROGRAMING\\KEMEX-Agent\\SHURY-AI-Agent-main\\data_sample",
+  "passed": 0,
+  "total": 10,
+  "core_passed": 0,
+  "core_total": 7,
+  "results": [
+    {
+      "id": "R1_tayba_top_product",
+      "group": "tayba",
+      "split": "REAL",
+      "passed": false,
+      "reason": "المنتج أو قيمته غلط",
+      "response": "مالي كمية أجهزة التبريد (Total Chillers Quantity) 14K إجمالي الكمية الجافة (Total Dry Quantity) 1M 📈 الرسوم البيانية Total Sales by Year – خط زمني يوضح تطور المبيعات بين عامي 2013 و2016 Sales By State – جدول تفصيلي للمبيعات حسب الولاية/المنطقة يشمل: Total Sales، Total Quantity، Sales Performance، Sum of Profit Total Sales and Total Quantity by Stock Item – رسم شريطي يوضح أعلى الأصناف مبيعًا حسب ال",
+      "seconds": 61.73,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R2_tayba_total_sales",
+      "group": "tayba",
+      "split": "REAL",
+      "passed": false,
+      "reason": "الإجمالي غلط (يمكن جمع عمود الكمية بدل القيمة)",
+      "response": "تُظهر لوحة الترتيب في Salesflare أعضاء الفريق الذين حققوا أعلى إجمالي مبيعات مقارنةً بالحصة 6. [S1]\nير النشاط الإجمالي بصفتك مديرًا، من المهم أن تتابع إنتاجية فريقك ومقاييس المبيعات لديه. [S2]\nوتتمثل إحدى الطرق لتحقيق ذلك في امتلاك القدرة على استعراض النشاط الإجمالي لفريقك بسرعة. [S3]\n📝 وصف المشروع يهدف هذا المشروع إلى تحويل بيانات المبيعات الخام (بصيغة CSV) إلى لوحة معلومات (Dashboard) تفاعلية وس",
+      "seconds": 10.85,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R3_tayba_low_stock",
+      "group": "tayba",
+      "split": "REAL",
+      "passed": false,
+      "reason": "عدد الأصناف الأقل من حد الطلب غلط (مقارنة عمودين)",
+      "response": "محتاج تحديد: anaphoric_reference_unresolved",
+      "seconds": 1.38,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": true
+    },
+    {
+      "id": "R4_sebaeya_boq_total",
+      "group": "sebaeya",
+      "split": "REAL",
+      "passed": false,
+      "reason": "إجمالي المقايسة غلط (الكمية أو سعر الوحدة اتجمعوا بدل amount)",
+      "response": "محتاج معلومة إضافية تحدد الهدف.",
+      "seconds": 1.34,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R5_sebaeya_concrete_volume",
+      "group": "sebaeya",
+      "split": "REAL",
+      "passed": false,
+      "reason": "رد بحجم قاعدة واحدة (أهمل عدد القواعد)",
+      "response": "على سبيل المثال، إذا كان لديك 100 عميل يدفع كل منهم 50 دولارًا شهريًا مقابل خدمتك، فستكون الإيرادات المتكررة الشهرية لديك: MRR = 100 عميلًا × 50 دولارًا شهريًا = 5,000 دولار شهريًا رسم بياني في Salesflare يوضح نمو MRR على مدار العام 📈 7. [S1]\nالصيغة متوسط دورة البيع = (إجمالي عدد الأيام لدورة البيع لجميع الصفقات) / (عدد الصفقات) متوسط القيمة = (إجمالي قيمة جميع الصفقات / عدد الصفقات) إليك كيف يحسب",
+      "seconds": 10.66,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": true
+    },
+    {
+      "id": "R6_sebaeya_daily_reports_count",
+      "group": "sebaeya",
+      "split": "REAL",
+      "passed": false,
+      "reason": "عدد تقارير md غلط (يمكن عدّ كل الملفات)",
+      "response": "مالي كمية أجهزة التبريد (Total Chillers Quantity) 14K إجمالي الكمية الجافة (Total Dry Quantity) 1M 📈 الرسوم البيانية Total Sales by Year – خط زمني يوضح تطور المبيعات بين عامي 2013 و2016 Sales By State – جدول تفصيلي للمبيعات حسب الولاية/المنطقة يشمل: Total Sales، Total Quantity، Sales Performance، Sum of Profit Total Sales and Total Quantity by Stock Item – رسم شريطي يوضح أعلى الأصناف مبيعًا حسب ال",
+      "seconds": 10.29,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R7_trust_design_fee",
+      "group": "trust_es",
+      "split": "REAL",
+      "passed": false,
+      "reason": "الأتعاب غلط",
+      "response": "📝 وصف المشروع يهدف هذا المشروع إلى تحويل بيانات المبيعات الخام (بصيغة CSV) إلى لوحة معلومات (Dashboard) تفاعلية وسهلة الفهم باستخدام Power BI. [S1]\n\nالمصادر:\n• Item Sales Summary Report - GitHub",
+      "seconds": 11.25,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": true
+    },
+    {
+      "id": "R8_trust_contractor_memory",
+      "group": "trust_es",
+      "split": "REAL",
+      "passed": false,
+      "reason": "ما رجّعش رقم مقاول الدهانات اللي اتسجل",
+      "response": "حساب الدهانات وكمية البويه للمتر المربع (دليل 2026) — مهندس الموقع مهندس الموقع site-engineer.net التنقل الرئيسية الحاسبات الأدلة الأقسام مدني إنشائي معماري مساحة تكاليف ميكانيكي كهربائي المراجع المتجر تسجيل الدخول إنشاء حساب بحث EN إعدادات المظهر اللون الأساسي ✓ ✓ ✓ ✓ ✓ تسجيل الدخول إنشاء حساب الحساب الرئيسية › الأدلة › حساب الدهانات وكمية البويه للمتر المربع (دليل 2026) حساب الدهانات وكمية البوي",
+      "seconds": 30.58,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R9_palm_best_block",
+      "group": "farm",
+      "split": "REAL",
+      "passed": false,
+      "reason": "الحوض أو كمية الكيلو غلط (يمكن اتخد عدد الأشجار بدل الكيلو)",
+      "response": "لحساب المتر المربع لوحدات التخزين، قم بقياس الطول والعرض والارتفاع، ثم قم بعملية ضرب العرض في الارتفاع قسمة على الطول، مثال: حوض استحمام عرضه متران، طوله 700سم، وارتفاعه 500سم. [S1]\nعادةً ما يقدّم تقرير المبيعات رؤية تحليلية حول ما يلي: الإيرادات المحققة، إلى جانب نسبة المبيعات المنجزة مقارنةً بالأهداف العملاء المحتملون الأعلى تحقيقًا للإيرادات، ومختلف مؤشرات الأداء الرئيسية (KPIs) المرتبطة بعمليا",
+      "seconds": 11.25,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    },
+    {
+      "id": "R10_tayba_report_to_folder",
+      "group": "tayba",
+      "split": "REAL",
+      "passed": false,
+      "reason": "التقرير tayba_report.md مش في مجلد reports",
+      "response": "محتاج تحديد: goal_or_capability",
+      "seconds": 1.52,
+      "crashed": false,
+      "approvals_requested": 0,
+      "stretch": false
+    }
+  ]
+}
