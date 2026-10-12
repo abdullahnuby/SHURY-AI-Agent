@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 from app.knowledge.data_analysis import answer_question, profile_dataset
+from app.runtime.security import safe_workspace_path
 
 from .base import SpecialistAgent
 from .contracts import AgentResult, AgentSpec, AgentTask
@@ -26,6 +28,31 @@ class DataAgent(SpecialistAgent):
             )
         )
 
+    @staticmethod
+    def _resolve_dataset_path(path_value: Any) -> Path:
+        path_text = str(path_value or "").strip()
+        if not path_text:
+            raise ValueError("path is required for data analysis")
+
+        if path_text == "@active_dataset":
+            workspace = Path(os.getenv("AGENT_WORKSPACE") or Path.cwd()).expanduser().resolve()
+            candidates = sorted(
+                p for p in workspace.rglob("*")
+                if p.is_file() and p.suffix.casefold() in {".csv", ".json", ".db", ".sqlite", ".sqlite3"}
+                and not p.name.startswith(".")
+            )
+            if not candidates:
+                raise FileNotFoundError("no supported dataset found in workspace")
+            if len(candidates) > 1:
+                raise ValueError("multiple datasets found in workspace; specify a file explicitly")
+            return safe_workspace_path(candidates[0])
+
+        candidate = Path(path_text).expanduser()
+        if not candidate.is_absolute():
+            workspace = Path(os.getenv("AGENT_WORKSPACE") or Path.cwd()).expanduser().resolve()
+            candidate = (workspace / candidate).resolve()
+        return safe_workspace_path(candidate)
+
     def run(self, task: AgentTask) -> AgentResult:
         path_value = task.inputs.get("path") or task.inputs.get("file_path") or task.inputs.get("dataset")
         if not path_value:
@@ -37,7 +64,17 @@ class DataAgent(SpecialistAgent):
                 metadata={"kind": "missing_dataset_path"},
             )
 
-        path = Path(str(path_value)).expanduser()
+        try:
+            path = self._resolve_dataset_path(path_value)
+        except (FileNotFoundError, ValueError) as exc:
+            return AgentResult(
+                task_id=task.task_id,
+                status="blocked",
+                output=None,
+                errors=(str(exc),),
+                metadata={"kind": "invalid_dataset_path"},
+            )
+
         if not path.exists():
             return AgentResult(
                 task_id=task.task_id,

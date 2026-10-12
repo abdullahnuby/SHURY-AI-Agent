@@ -141,6 +141,21 @@ class CognitiveKernel:
                         errors=("no executable steps in graph",),
                         metadata={"kind": "graph_execution", "graph": graph.to_dict()},
                     )
+
+                failed_nodes = [node for node in graph.nodes if getattr(node, "status", "pending") == "failed"]
+                pending_nodes = [node.id for node in graph.nodes if getattr(node, "status", "pending") == "pending"]
+                if failed_nodes or pending_nodes:
+                    return AgentResult(
+                        task_id=f"kernel-graph-{uuid.uuid4().hex[:8]}",
+                        status="failed" if failed_nodes else "blocked",
+                        output={"order": order, "results": result_map, "graph": graph.to_dict(), "pending": pending_nodes},
+                        errors=tuple(
+                            [f"node failed: {node.id}" for node in failed_nodes] +
+                            [f"pending node: {node_id}" for node_id in pending_nodes]
+                        ) or ("graph execution did not finish successfully",),
+                        evidence=tuple(evidence),
+                        metadata={"kind": "graph_execution", "graph": graph.to_dict()},
+                    )
                 break
 
             node = ready_nodes[0]
@@ -165,20 +180,26 @@ class CognitiveKernel:
             )
             node.status = "running"
             result = self.dispatch_specialist_task(task, session_id=session_id)
-            node.status = "done" if result.status == "success" else "failed"
             order.append(node.id)
             result_map[node.id] = result.output
             evidence.extend(result.evidence)
 
-            if result.status in {"blocked", "failed", "needs_input", "timeout"}:
-                return AgentResult(
-                    task_id=task.task_id,
-                    status=result.status,
-                    output={"order": order, "results": result_map, "graph": graph.to_dict()},
-                    errors=result.errors,
-                    evidence=tuple(evidence),
-                    metadata={"kind": "graph_execution", "node": node.id, "tool": node.tool},
-                )
+            if result.status == "success":
+                node.status = "done"
+                node.output = result.output
+                continue
+
+            node.status = "failed"
+            node.output = result.output
+            node.error = result.errors[0] if result.errors else result.status
+            return AgentResult(
+                task_id=task.task_id,
+                status=result.status if result.status in {"partial", "blocked", "failed", "needs_input", "timeout"} else "failed",
+                output={"order": order, "results": result_map, "graph": graph.to_dict()},
+                errors=result.errors or (f"node failed: {node.id}",),
+                evidence=tuple(evidence),
+                metadata={"kind": "graph_execution", "node": node.id, "tool": node.tool, "status": result.status},
+            )
 
         return AgentResult(
             task_id=f"kernel-graph-{uuid.uuid4().hex[:8]}",
@@ -688,19 +709,32 @@ class CognitiveKernel:
 
     def _run_action(self, state: CognitiveState, action: PlannedAction, outputs: dict[str, Any],
                     approve: Callable[[str, dict[str, Any]], bool]) -> tuple[bool, Any, str | None, bool, float]:
+        tool = self.registry.get(action.tool)
         if action.tool in {'profile_dataset', 'analyze_dataset'}:
+            if tool is None:
+                return False, None, f'الأداة {action.tool} غير مسجلة.', False, 0.0
+            args = self._resolve_action_args(action, outputs)
+            errors = tool.validate_args(args)
+            if errors:
+                return False, None, '; '.join(errors), False, 0.0
+            policy = check_tool(tool, args)
+            state.event('policy_check', step=action.step_id, tool=tool.name,
+                        allowed=policy.allowed, approval_required=policy.approval_required, reason=policy.reason)
+            if not policy.allowed:
+                return False, None, policy.reason or 'operation blocked by runtime policy', False, 0.0
+            if policy.approval_required and not approve(tool.name, args):
+                return False, None, 'تم رفض العملية التي تحتاج موافقة.', False, 0.0
+            path_value = args.get('path') or args.get('file_path') or args.get('dataset') or ''
+            if not str(path_value).strip():
+                return False, None, 'dataset path is required for data analysis', False, 0.0
             try:
-                specialist = self.specialist_registry.resolve('data_analysis')
-            except Exception:
-                specialist = None
+                from app.runtime.security import safe_workspace_path
+                safe_path = safe_workspace_path(str(path_value))
+            except ValueError as exc:
+                return False, None, str(exc), False, 0.0
+            specialist = self.specialist_registry.resolve('data_analysis')
             if specialist is not None:
-                args = self._resolve_action_args(action, outputs)
-                if not approve('data_analysis', args):
-                    return False, None, 'تم رفض العملية التي تحتاج موافقة.', False, 0.0
-                path = str(args.get('path') or args.get('file_path') or args.get('dataset') or '').strip()
-                if not path:
-                    return False, None, 'dataset path is required for data analysis', False, 0.0
-                task_inputs = {'path': path, 'mode': 'profile' if action.tool == 'profile_dataset' else 'analysis'}
+                task_inputs = {'path': str(safe_path), 'mode': 'profile' if action.tool == 'profile_dataset' else 'analysis'}
                 if action.tool == 'analyze_dataset':
                     question = args.get('question') or args.get('query')
                     if question is None:
@@ -725,7 +759,8 @@ class CognitiveKernel:
                             ok=True, status=result.status, specialist='data-agent')
                 return True, result.output, None, True, 0.0
 
-        tool = self.registry.get(action.tool)
+        if tool is None:
+            return False, None, f'الأداة {action.tool} غير مسجلة.', False, 0.0
         if tool is None:
             return False, None, f'الأداة {action.tool} غير مسجلة.', False, 0.0
         args = self._resolve_action_args(action, outputs)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Any
 
 from .base import SpecialistAgent
@@ -84,14 +85,33 @@ class AgentRegistry:
                 errors=(f"unknown capability: {task.capability}",),
                 metadata={"kind": "capability_resolution"},
             )
+        timeout_limit = float(task.timeout_seconds)
+        max_timeout = float(agent.spec.max_timeout_seconds)
+        if timeout_limit <= 0 or max_timeout <= 0:
+            return AgentResult(
+                task_id=task.task_id,
+                status="blocked",
+                errors=("timeout must be positive for specialist execution",),
+                metadata={"kind": "invalid_timeout"},
+            )
+        timeout_limit = min(timeout_limit, max_timeout)
         try:
-            result = agent.run(task)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(agent.run, task)
+                result = future.result(timeout=timeout_limit)
+        except FutureTimeoutError:
+            return AgentResult(
+                task_id=task.task_id,
+                status="timeout",
+                errors=(f"agent timed out after {timeout_limit:.3f}s",),
+                metadata={"kind": "execution_timeout", "timeout_seconds": timeout_limit},
+            )
         except TimeoutError:
             return AgentResult(
                 task_id=task.task_id,
                 status="timeout",
-                errors=("agent timed out",),
-                metadata={"kind": "execution_timeout"},
+                errors=(f"agent timed out after {timeout_limit:.3f}s",),
+                metadata={"kind": "execution_timeout", "timeout_seconds": timeout_limit},
             )
         except Exception as exc:  # pragma: no cover - default fail-closed path
             return AgentResult(
@@ -100,6 +120,23 @@ class AgentRegistry:
                 errors=(f"{type(exc).__name__}: {exc}",),
                 metadata={"kind": "execution_exception"},
             )
+
+        if not isinstance(result, AgentResult):
+            return AgentResult(
+                task_id=task.task_id,
+                status="blocked",
+                errors=("agent returned a non-AgentResult payload",),
+                metadata={"kind": "result_type_validation"},
+            )
+
+        if result.task_id != task.task_id:
+            return AgentResult(
+                task_id=task.task_id,
+                status="blocked",
+                errors=(f"task_id mismatch: expected {task.task_id}, got {result.task_id}",),
+                metadata={"kind": "result_task_id_mismatch", "expected_task_id": task.task_id, "actual_task_id": result.task_id},
+            )
+
         validation_errors = agent.validate_result(result)
         if validation_errors:
             return AgentResult(

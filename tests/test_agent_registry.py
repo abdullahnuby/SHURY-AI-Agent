@@ -1,3 +1,5 @@
+import os
+import time
 from pathlib import Path
 
 from app.agents import AgentRegistry, AgentResult, AgentTask, DataAgent, DevelopmentAgent, InertAgent, ResearchAgent, SpecialistAgent, VerifierAgent
@@ -111,56 +113,76 @@ def test_dispatch_handles_timeout_and_exception_paths():
 
 
 def test_data_agent_profiles_dataset_and_handles_question_mode(tmp_path):
-    dataset = tmp_path / "sample.csv"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    dataset = workspace / "sample.csv"
     dataset.write_text("name,score,region\nA,10,North\nB,20,South\nC,18,North\n", encoding="utf-8")
 
-    registry = AgentRegistry([DataAgent()])
-    profile = registry.dispatch(
-        AgentTask(
-            task_id="data-profile",
-            objective="profile dataset",
-            capability="data_analysis",
-            inputs={"path": str(dataset)},
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        registry = AgentRegistry([DataAgent()])
+        profile = registry.dispatch(
+            AgentTask(
+                task_id="data-profile",
+                objective="profile dataset",
+                capability="data_analysis",
+                inputs={"path": str(dataset)},
+            )
         )
-    )
-    assert profile.status == "success"
-    assert profile.output["rows"] == 3
-    assert profile.output["columns"] == 3
+        assert profile.status == "success"
+        assert profile.output["rows"] == 3
+        assert profile.output["columns"] == 3
 
-    answer = registry.dispatch(
-        AgentTask(
-            task_id="data-answer",
-            objective="summarize the dataset",
-            capability="data_analysis",
-            inputs={"path": str(dataset), "mode": "analysis", "question": "What is the average score?"},
+        answer = registry.dispatch(
+            AgentTask(
+                task_id="data-answer",
+                objective="summarize the dataset",
+                capability="data_analysis",
+                inputs={"path": str(dataset), "mode": "analysis", "question": "What is the average score?"},
+            )
         )
-    )
-    assert answer.status == "success"
-    assert "answer" in answer.output
+        assert answer.status == "success"
+        assert "answer" in answer.output
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
 
 
 def test_kernel_dispatch_specialist_task_remains_subordinate(tmp_path):
-    dataset = tmp_path / "sample.csv"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    dataset = workspace / "sample.csv"
     dataset.write_text("value\n4\n8\n12\n", encoding="utf-8")
 
-    kernel = CognitiveKernel()
-    profile = kernel.dispatch_specialist_task({
-        "task_id": "kernel-profile",
-        "objective": "profile dataset",
-        "capability": "data_analysis",
-        "inputs": {"path": str(dataset)},
-    }, session_id="kernel-session")
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        kernel = CognitiveKernel()
+        profile = kernel.dispatch_specialist_task({
+            "task_id": "kernel-profile",
+            "objective": "profile dataset",
+            "capability": "data_analysis",
+            "inputs": {"path": str(dataset)},
+        }, session_id="kernel-session")
 
-    assert profile.status == "success"
-    assert profile.output["rows"] == 3
+        assert profile.status == "success"
+        assert profile.output["rows"] == 3
 
-    blocked = kernel.dispatch_specialist_task({
-        "task_id": "kernel-missing",
-        "objective": "do the impossible",
-        "capability": "missing-capability",
-    }, session_id="kernel-session")
-    assert blocked.status == "blocked"
-    assert "unknown capability" in blocked.errors[0]
+        blocked = kernel.dispatch_specialist_task({
+            "task_id": "kernel-missing",
+            "objective": "do the impossible",
+            "capability": "missing-capability",
+        }, session_id="kernel-session")
+        assert blocked.status == "blocked"
+        assert "unknown capability" in blocked.errors[0]
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
 
 
 def test_research_agent_returns_bounded_evidence_and_remains_read_only():
@@ -222,56 +244,170 @@ def test_verifier_agent_validates_dataset_analysis_result():
 
 
 def test_kernel_specialist_workflow_is_serial_and_bounded(tmp_path):
-    dataset = tmp_path / "sample.csv"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    dataset = workspace / "sample.csv"
     dataset.write_text("value\n4\n8\n12\n", encoding="utf-8")
 
-    kernel = CognitiveKernel()
-    workflow = kernel.run_specialist_workflow(
-        dataset_path=str(dataset),
-        question="What is the average value?",
-        session_id="workflow-session",
-    )
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        kernel = CognitiveKernel()
+        workflow = kernel.run_specialist_workflow(
+            dataset_path=str(dataset),
+            question="What is the average value?",
+            session_id="workflow-session",
+        )
 
-    assert workflow.status == "success"
-    assert workflow.output["profile"]["rows"] == 3
-    assert "answer" in workflow.output["analysis"]
-    assert workflow.output["verification"]["verified"] is True
+        assert workflow.status == "success"
+        assert workflow.output["profile"]["rows"] == 3
+        assert "answer" in workflow.output["analysis"]
+        assert workflow.output["verification"]["verified"] is True
 
-    blocked = kernel.run_specialist_workflow(dataset_path="", question="still works")
-    assert blocked.status == "blocked"
-    assert "dataset_path is required" in blocked.errors[0]
+        blocked = kernel.run_specialist_workflow(dataset_path="", question="still works")
+        assert blocked.status == "blocked"
+        assert "dataset_path is required" in blocked.errors[0]
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
 
 
 def test_kernel_executes_specialist_dag_in_dependency_order(tmp_path):
-    dataset = tmp_path / "sample.csv"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    dataset = workspace / "sample.csv"
     dataset.write_text("value\n4\n8\n12\n", encoding="utf-8")
 
-    kernel = CognitiveKernel()
-    graph = TaskGraph([
-        TaskNode("profile", "profile_dataset", {"path": str(dataset)}),
-        TaskNode("analysis", "analyze_dataset", {"path": str(dataset), "question": "What is the average value?"}, ["profile"]),
-    ])
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        kernel = CognitiveKernel()
+        graph = TaskGraph([
+            TaskNode("profile", "profile_dataset", {"path": str(dataset)}),
+            TaskNode("analysis", "analyze_dataset", {"path": str(dataset), "question": "What is the average value?"}, ["profile"]),
+        ])
 
-    result = kernel.execute_specialist_graph(graph, session_id="dag-session")
+        result = kernel.execute_specialist_graph(graph, session_id="dag-session")
 
-    assert result.status == "success"
-    assert result.output["order"] == ["profile", "analysis"]
-    assert result.output["results"]["profile"]["rows"] == 3
-    assert "answer" in result.output["results"]["analysis"]
+        assert result.status == "success"
+        assert result.output["order"] == ["profile", "analysis"]
+        assert result.output["results"]["profile"]["rows"] == 3
+        assert "answer" in result.output["results"]["analysis"]
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
+
+
+def test_data_agent_rejects_path_outside_workspace(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.csv"
+    outside.write_text("value\n1\n2\n", encoding="utf-8")
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        registry = AgentRegistry([DataAgent()])
+        result = registry.dispatch(AgentTask(task_id="outside-path", objective="profile outside dataset", capability="data_analysis", inputs={"path": str(outside)}))
+        assert result.status == "blocked"
+        assert "workspace" in result.errors[0].lower()
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
+
+
+def test_registry_rejects_result_id_mismatch_and_timeout():
+    class WrongIdAgent(SpecialistAgent):
+        def __init__(self):
+            SpecialistAgent.__init__(self, {"agent_id": "wrong-id-agent", "name": "wrong", "capability": "wrong-id", "description": "wrong", "read_only": True, "max_timeout_seconds": 5.0})
+
+        def run(self, task: AgentTask) -> AgentResult:
+            return AgentResult(task_id="different-id", status="success", output={"ok": True})
+
+    class SlowAgent(SpecialistAgent):
+        def __init__(self):
+            SpecialistAgent.__init__(self, {"agent_id": "slow-agent", "name": "slow", "capability": "slow", "description": "slow", "read_only": True, "max_timeout_seconds": 5.0})
+
+        def run(self, task: AgentTask) -> AgentResult:
+            time.sleep(0.2)
+            return AgentResult(task_id=task.task_id, status="success", output={"ok": True})
+
+    wrong = AgentRegistry([WrongIdAgent()])
+    wrong_result = wrong.dispatch(AgentTask(task_id="expected", objective="wrong id", capability="wrong-id"))
+    assert wrong_result.status == "blocked"
+    assert "task_id mismatch" in wrong_result.errors[0]
+
+    slow = AgentRegistry([SlowAgent()])
+    slow_result = slow.dispatch(AgentTask(task_id="slow-task", objective="slow", capability="slow", timeout_seconds=0.05))
+    assert slow_result.status == "timeout"
+
+
+def test_verifier_agent_rejects_null_answers():
+    registry = AgentRegistry([VerifierAgent()])
+    result = registry.dispatch(
+        AgentTask(
+            task_id="verify-null",
+            objective="reject empty answer",
+            capability="verification",
+            inputs={"profile": {"rows": 3, "columns": 2}, "analysis": {"answer": None, "method": "row_count"}},
+        )
+    )
+    assert result.status == "blocked"
+    assert "answer cannot be null" in result.errors[0]
+
+
+def test_kernel_graph_rejects_failed_node_before_success(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.csv"
+    outside.write_text("value\n1\n2\n", encoding="utf-8")
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        kernel = CognitiveKernel()
+        dataset = workspace / "inside.csv"
+        dataset.write_text("value\n4\n8\n12\n", encoding="utf-8")
+        graph = TaskGraph([
+            TaskNode("profile", "profile_dataset", {"path": str(outside)}),
+            TaskNode("analysis", "analyze_dataset", {"path": str(dataset), "question": "What is the average value?"}, ["profile"]),
+        ])
+        result = kernel.execute_specialist_graph(graph, session_id="failed-dag")
+        assert result.status in {"failed", "blocked"}
+        assert "profile" in result.output["results"]
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous
 
 
 def test_kernel_summarizes_specialist_workflow_for_final_response(tmp_path):
-    dataset = tmp_path / "sample.csv"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    dataset = workspace / "sample.csv"
     dataset.write_text("value\n4\n8\n12\n", encoding="utf-8")
 
-    kernel = CognitiveKernel()
-    workflow = kernel.run_specialist_workflow(
-        dataset_path=str(dataset),
-        question="What is the average value?",
-        session_id="summary-session",
-    )
+    previous = os.environ.get("AGENT_WORKSPACE")
+    os.environ["AGENT_WORKSPACE"] = str(workspace)
+    try:
+        kernel = CognitiveKernel()
+        workflow = kernel.run_specialist_workflow(
+            dataset_path=str(dataset),
+            question="What is the average value?",
+            session_id="summary-session",
+        )
 
-    summary = kernel.summarize_specialist_workflow(workflow)
-    assert "Dataset profile" in summary
-    assert "Verification: passed" in summary
-    assert "Analysis" in summary
+        summary = kernel.summarize_specialist_workflow(workflow)
+        assert "Dataset profile" in summary
+        assert "Verification: passed" in summary
+        assert "Analysis" in summary
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_WORKSPACE", None)
+        else:
+            os.environ["AGENT_WORKSPACE"] = previous

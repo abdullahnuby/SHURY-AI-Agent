@@ -21,6 +21,8 @@ from collections import Counter, defaultdict
 from statistics import mean, median, pstdev
 from typing import Any, Iterable
 
+from app.runtime.security import safe_workspace_path
+
 
 TRUE_VALUES = {"true", "1", "yes", "y", "نعم", "صح"}
 FALSE_VALUES = {"false", "0", "no", "n", "لا", "خطأ"}
@@ -258,6 +260,9 @@ def _read_sqlite(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
 
 def _resolve_input_path(path: str | Path) -> Path:
     raw_text = str(path or "").strip()
+    if not raw_text:
+        raise DataAnalysisError("مسار dataset مطلوب")
+
     workspace = os.getenv("AGENT_WORKSPACE")
     base = Path(workspace).expanduser().resolve() if workspace else Path.cwd().resolve()
 
@@ -266,7 +271,7 @@ def _resolve_input_path(path: str | Path) -> Path:
     # silently choosing the first file.
     if raw_text == "@active_dataset":
         candidates = sorted(
-            p for p in base.iterdir()
+            p for p in base.rglob("*")
             if p.is_file() and p.suffix.casefold() in {".csv", ".json", ".db", ".sqlite", ".sqlite3"}
             and not p.name.startswith(".")
         )
@@ -274,15 +279,14 @@ def _resolve_input_path(path: str | Path) -> Path:
             raise DataAnalysisError("مفيش dataset واحد واضح في الـworkspace")
         if len(candidates) > 1:
             raise DataAnalysisError("أكثر من dataset موجود في الـworkspace؛ حدد الملف صراحة")
-        return candidates[0].resolve()
+        return safe_workspace_path(candidates[0])
 
     raw = Path(raw_text).expanduser()
-    if not raw.is_absolute():
-        candidate = (base / raw).resolve()
-        if base != candidate and base not in candidate.parents:
-            raise DataAnalysisError(f"المسار خارج الـworkspace: {path}")
-        return candidate
-    return raw.resolve()
+    candidate = raw.resolve() if raw.is_absolute() else (base / raw).resolve()
+    try:
+        return safe_workspace_path(candidate)
+    except ValueError as exc:
+        raise DataAnalysisError(str(exc)) from exc
 
 
 def load_rows(path: str | Path) -> tuple[Path, list[str], list[dict[str, Any]]]:
